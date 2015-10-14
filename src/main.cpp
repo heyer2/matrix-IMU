@@ -1,5 +1,6 @@
 #include "Arduino.h"
 #include "Wire.h"
+#include <matrix.h>
 
 #define ACC_SAD 0x19
 #define ACC_SUB_SPEED 0x20
@@ -11,10 +12,14 @@
 #define MAG_SUB_MODE 0x02
 #define MAG_SUB_OUT (0x03|0x80) // initial register + incrementing output
 
+#define GYR_SAD 0x6B
+#define GYR_SUB_ENABLE 0x20
+#define GYR_SUB_OUT (0x28|0x80) // initial register + incrementing output
+
 #define LED_PIN 13
 #define SERIAL_BAUD 9600
 
-void mag_init(void)
+void magInit(void)
 {	
 	Wire.beginTransmission(MAG_SAD); // slave-address
 	Wire.write(MAG_SUB_GAIN);
@@ -32,7 +37,7 @@ void mag_init(void)
 	Wire.endTransmission(1);
 }
 
-void acc_init(void)
+void accInit(void)
 {	
 	Wire.beginTransmission(ACC_SAD); // slave-address
 	Wire.write(ACC_SUB_SPEED); // sub-address
@@ -40,61 +45,103 @@ void acc_init(void)
 	Wire.endTransmission(1);
 }
 
+void gyrInit(void)
+{
+	Wire.beginTransmission(GYR_SAD); // slave-address
+	Wire.write(GYR_SUB_ENABLE); // sub-address
+	Wire.write(0x3F); // 100hz, all enable, turn on
+	Wire.endTransmission(1);
+}
+
 void setup()
 {
 	pinMode(LED_PIN, OUTPUT);     // set pin as output
 	Serial.begin(SERIAL_BAUD);
-	delay(2000);
-	Serial.printf("After delay\n\r");
 	Wire.begin();
-	acc_init();
-	mag_init();
-	
-	Serial.printf("Initial connect\n\r");
-
-	Serial.printf("After config\n\r");
-	
+	accInit();
+	magInit();
+	gyrInit();	
 }
 
-void loop()
-{	
+void gyrUpdate(struct vec3 * vec)
+{
+	Wire.beginTransmission(GYR_SAD);
+	Wire.write(GYR_SUB_OUT);
+	Wire.endTransmission(0);
+	Wire.requestFrom(GYR_SAD, 6);
+	unsigned int XL = Wire.read();
+	unsigned int XH = Wire.read();
+	unsigned int YL = Wire.read();
+	unsigned int YH = Wire.read();
+	unsigned int ZL = Wire.read();
+	unsigned int ZH = Wire.read();	
+	
+	vec->data[0] = (short)(XH << 8 | XL);
+	vec->data[1] = (short)(YH << 8 | YL);
+	vec->data[2] = (short)(ZH << 8 | ZL);
+}
+
+void accUpdate(struct vec3 * vec)
+{
 	Wire.beginTransmission(ACC_SAD);
 	Wire.write(ACC_SUB_OUT);
 	Wire.endTransmission(0);
 	Wire.requestFrom(ACC_SAD, 6);
-	unsigned int XLA = Wire.read();
-	unsigned int XHA = Wire.read();
-	unsigned int YLA = Wire.read();
-	unsigned int YHA = Wire.read();
-	unsigned int ZLA = Wire.read();
-	unsigned int ZHA = Wire.read();	
+	unsigned int XL = Wire.read();
+	unsigned int XH = Wire.read();
+	unsigned int YL = Wire.read();
+	unsigned int YH = Wire.read();
+	unsigned int ZL = Wire.read();
+	unsigned int ZH = Wire.read();	
 	
-	float accX = (short)(XHA << 8 | XLA);
-	float accY = (short)(YHA << 8 | YLA);
-	float accZ = (short)(ZHA << 8 | ZLA);
-	
-	
-	Wire.beginTransmission(MAG_SAD);
+	vec->data[0] = (short)(XH << 8 | XL);
+	vec->data[1] = (short)(YH << 8 | YL);
+	vec->data[2] = (short)(ZH << 8 | ZL);
+}	
+
+void magUpdate(struct vec3 * vec)
+{
+Wire.beginTransmission(MAG_SAD);
 	Wire.write(MAG_SUB_OUT);
 	Wire.endTransmission(0);
 	Wire.requestFrom(MAG_SAD, 6);
+	unsigned int XH = Wire.read();
+	unsigned int XL = Wire.read();
+	unsigned int ZH = Wire.read();
+	unsigned int ZL = Wire.read();
+	unsigned int YH = Wire.read();
+	unsigned int YL = Wire.read();	
 	
-	unsigned int XHM = Wire.read();
-	unsigned int XLM = Wire.read();
-	unsigned int ZHM = Wire.read();
-	unsigned int ZLM = Wire.read();
-	unsigned int YHM = Wire.read();
-	unsigned int YLM = Wire.read();	
+	vec->data[0] = (short)(XH << 8 | XL);
+	vec->data[1] = (short)(YH << 8 | YL);
+	vec->data[2] = (short)(ZH << 8 | ZL);
+}	
+
+void loop()
+{	
+	//static mat3 matOrientation 
 	
-	float magX = (short)(XHM << 8 | XLM);
-	float magY = (short)(YHM << 8 | YLM);
-	float magZ = (short)(ZHM << 8 | ZLM);
+	struct vec3 vecGyrData;
+	struct vec3 vecMagData;
+	struct vec3 vecAccData;
 	
-	Serial.printf("%f %f %f %f %f %f\n\r", accX, accY, accZ, magX, magY, magZ);
+	gyrUpdate(&vecGyrData);
+	//magUpdate(&vecMagData);
+	//accUpdate(&vecAccData);
 	
 	
+	
+	
+	/*
+	vec3Print(&vecAccData); 
+	Serial.printf(" ");
+	vec3Print(&vecMagData); 
+	Serial.printf(" ");
+	vec3Print(&vecGyrData); 
+	Serial.printf("\n\r");
+	*/
 	///Serial.printf("%f %f %f\n\r", accX, accY, accZ);
-	delay(200);
+	delay(100);
 	
 	//Serial.printf("Got the first\n\r");
 	//unsigned int XHA = Wire.read();
