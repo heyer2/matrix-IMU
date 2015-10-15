@@ -1,11 +1,11 @@
-#include <math.h>
+//#include <math.h>
 #include <matrix.h>
 #include "arduino.h"
 
 void mat3Print(struct mat3 * mat)
 {
 	for (int i = 0; i < 9; i++)
-		Serial.printf("%f", *((float*)mat->data + i));
+		Serial.printf("%f ", *((float*)mat->data + i));
 }
 
 void vec3Print(struct vec3 * vec)
@@ -18,6 +18,13 @@ void vec3Zero(struct vec3 * vec)
 	vec->data[0] = 0;
 	vec->data[1] = 0;
 	vec->data[2] = 0;
+}
+
+void vec3MultFac(struct vec3 * vec, float k)
+{
+	vec->data[0] *= k;
+	vec->data[1] *= k;
+	vec->data[2] *= k;
 }
 
 void mat3Zero(struct mat3 * mat)
@@ -34,7 +41,7 @@ void mat3Eyes(struct mat3 * mat)
 	mat->data[2][2] = 1;
 }
 
-void mat3SetRow(struct mat3 * mat, int row, float a, float b, float c)
+void mat3SetRow(int row, struct mat3 * mat, float a, float b, float c)
 {
 	mat->data[row][0] = a;
 	mat->data[row][1] = b;
@@ -58,24 +65,28 @@ void mat3Mult(struct mat3 * matA, struct mat3 * matB, struct mat3 * matC)
 	mat3Cpy(&matTemp, matC);
 }
 
-void mat3RotFromGyro(struct vec3 * vec, struct mat3 * matRot)
-{
+void mat3RotByGyr(struct vec3 * vecVel, struct mat3 * matOri, float timeElapsed)
+{	
+	struct vec3 vecRot = *vecVel;
+	vec3MultFac(&vecRot, timeElapsed);
+	
 	struct mat3 matRotX;
 	struct mat3 matRotY;
 	struct mat3 matRotZ;
 	
-	mat3SetRow(&matRotX, 0, 1, 0, 0);
-	mat3SetRow(&matRotX, 1, 0, cos(vec->data[0]), -sin(vec->data[0]));
-	mat3SetRow(&matRotX, 2, 0, sin(vec->data[0]),  cos(vec->data[0]));
+	mat3SetRow(0, &matRotX, 1, 0, 0);
+	mat3SetRow(1, &matRotX, 0, cos(vecRot.data[0]), -sin(vecRot.data[0]));
+	mat3SetRow(2, &matRotX, 0, sin(vecRot.data[0]),  cos(vecRot.data[0]));
 	
-	mat3SetRow(&matRotY, 0,  cos(vec->data[1]), 0, sin(vec->data[1]));
-	mat3SetRow(&matRotY, 1, 0, 1, 0);
-	mat3SetRow(&matRotY, 2, -sin(vec->data[1]), 0, cos(vec->data[1]));
+	mat3SetRow(0, &matRotY,  cos(vecRot.data[1]), 0, sin(vecRot.data[1]));
+	mat3SetRow(1, &matRotY, 0, 1, 0);
+	mat3SetRow(2, &matRotY, -sin(vecRot.data[1]), 0, cos(vecRot.data[1]));
 	
-	mat3SetRow(&matRotZ, 0, cos(vec->data[2]), -sin(vec->data[2]), 0);
-	mat3SetRow(&matRotZ, 1, sin(vec->data[2]),  cos(vec->data[2]), 0);
-	mat3SetRow(&matRotZ, 2, 0, 0, 1);
+	mat3SetRow(0, &matRotZ, cos(vecRot.data[2]), -sin(vecRot.data[2]), 0);
+	mat3SetRow(1, &matRotZ, sin(vecRot.data[2]),  cos(vecRot.data[2]), 0);
+	mat3SetRow(2, &matRotZ, 0, 0, 1);
 	
-	mat3Mult(&matRotY, &matRotX, matRot);
-	mat3Mult(&matRotZ, matRot, matRot);
+	mat3Mult(&matRotX, matOri, matOri);
+	mat3Mult(&matRotY, matOri, matOri);
+	mat3Mult(&matRotZ, matOri, matOri);
 }

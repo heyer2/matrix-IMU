@@ -16,8 +16,10 @@
 #define GYR_SUB_ENABLE 0x20
 #define GYR_SUB_OUT (0x28|0x80) // initial register + incrementing output
 
+#define GYR_LSB_RAD 0.00015271630955 // / 10000
+
 #define LED_PIN 13
-#define SERIAL_BAUD 9600
+#define SERIAL_BAUD 115200
 
 void magInit(void)
 {	
@@ -79,6 +81,8 @@ void gyrUpdate(struct vec3 * vec)
 	vec->data[0] = (short)(XH << 8 | XL);
 	vec->data[1] = (short)(YH << 8 | YL);
 	vec->data[2] = (short)(ZH << 8 | ZL);
+	
+	vec3MultFac(vec, GYR_LSB_RAD);
 }
 
 void accUpdate(struct vec3 * vec)
@@ -117,15 +121,47 @@ Wire.beginTransmission(MAG_SAD);
 	vec->data[2] = (short)(ZH << 8 | ZL);
 }	
 
+float timeSinceLastCall()
+{	
+	static int timeOld;
+	int timeNew = millis();
+	int timeElapsed = timeNew - timeOld;
+	timeOld = timeNew;
+	return (float)timeElapsed / 1000;
+}
+
+
+
 void loop()
 {	
-	//static mat3 matOrientation 
+	static float timeElapsed;
+	timeElapsed = timeSinceLastCall();
+	while(timeElapsed < 0.05)
+		timeElapsed += timeSinceLastCall();
+	
+	static mat3 matOri;
+	static int firstRun = 1;
+	if (firstRun) {
+		mat3Eyes(&matOri);
+		firstRun = 0;
+		Serial.printf("Doing stuff");
+	}
 	
 	struct vec3 vecGyrData;
 	struct vec3 vecMagData;
 	struct vec3 vecAccData;
 	
+	struct vec3 vecDummy;
+	vecDummy.data[2] = 0.03179938779915;
+	vecDummy.data[1] = 0;
+	vecDummy.data[0] = 0;
+	
 	gyrUpdate(&vecGyrData);
+	mat3RotByGyr(&vecGyrData, &matOri, timeElapsed);
+	mat3Print(&matOri);
+	Serial.printf("\n\r");
+	Serial.send_now();
+
 	//magUpdate(&vecMagData);
 	//accUpdate(&vecAccData);
 	
@@ -141,7 +177,7 @@ void loop()
 	Serial.printf("\n\r");
 	*/
 	///Serial.printf("%f %f %f\n\r", accX, accY, accZ);
-	delay(100);
+
 	
 	//Serial.printf("Got the first\n\r");
 	//unsigned int XHA = Wire.read();
