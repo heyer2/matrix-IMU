@@ -15,11 +15,17 @@
 #define GYR_SAD 0x6B
 #define GYR_SUB_ENABLE 0x20
 #define GYR_SUB_OUT (0x28|0x80) // initial register + incrementing output
+#define GYR_FREQUENCY 20
 
+#define GYR_OFFSET_SAMPLES 100
 #define GYR_LSB_RAD 0.00015271630955 // / 10000
 
-#define LED_PIN 13
 #define SERIAL_BAUD 115200
+
+#define ORTHO_FIX_INTERVAL 20
+
+	
+static struct vec3 vecGyrOff;
 
 void magInit(void)
 {	
@@ -55,17 +61,7 @@ void gyrInit(void)
 	Wire.endTransmission(1);
 }
 
-void setup()
-{
-	pinMode(LED_PIN, OUTPUT);     // set pin as output
-	Serial.begin(SERIAL_BAUD);
-	Wire.begin();
-	accInit();
-	magInit();
-	gyrInit();	
-}
-
-void gyrUpdate(struct vec3 * vec)
+void gyrUpdate(struct vec3 * vec, struct vec3 * vecOff)
 {
 	Wire.beginTransmission(GYR_SAD);
 	Wire.write(GYR_SUB_OUT);
@@ -83,6 +79,7 @@ void gyrUpdate(struct vec3 * vec)
 	vec->data[2] = (short)(ZH << 8 | ZL);
 	
 	vec3MultFac(vec, GYR_LSB_RAD);
+	vec3Add(vecOff, vec, vec);
 }
 
 void accUpdate(struct vec3 * vec)
@@ -105,7 +102,7 @@ void accUpdate(struct vec3 * vec)
 
 void magUpdate(struct vec3 * vec)
 {
-Wire.beginTransmission(MAG_SAD);
+	Wire.beginTransmission(MAG_SAD);
 	Wire.write(MAG_SUB_OUT);
 	Wire.endTransmission(0);
 	Wire.requestFrom(MAG_SAD, 6);
@@ -121,6 +118,20 @@ Wire.beginTransmission(MAG_SAD);
 	vec->data[2] = (short)(ZH << 8 | ZL);
 }	
 
+void gyrGetOffset(struct vec3 * vecOff)
+{	
+	struct vec3 vecTmp;
+	struct vec3 vecZero;
+	vec3Zero(&vecZero);
+	vec3Zero(vecOff);
+	for (int i = 0; i < GYR_OFFSET_SAMPLES; i++) {
+		gyrUpdate(&vecTmp, &vecZero);
+		vec3Add(&vecTmp, vecOff, vecOff);
+		delay(1000.0f / GYR_FREQUENCY);
+	}
+	vec3MultFac(vecOff, -1.0f / GYR_OFFSET_SAMPLES);
+}
+
 float timeSinceLastCall()
 {	
 	static int timeOld;
@@ -130,13 +141,22 @@ float timeSinceLastCall()
 	return (float)timeElapsed / 1000;
 }
 
-
+void setup()
+{
+	Serial.begin(SERIAL_BAUD);
+	Wire.begin();
+	accInit();
+	magInit();
+	gyrInit();
+	delay(1000);
+	gyrGetOffset(&vecGyrOff);
+}
 
 void loop()
 {	
 	static float timeElapsed;
 	timeElapsed = timeSinceLastCall();
-	while(timeElapsed < 0.05)
+	while(timeElapsed < 1.0f / GYR_FREQUENCY)
 		timeElapsed += timeSinceLastCall();
 	
 	static mat3 matOri;
@@ -151,16 +171,19 @@ void loop()
 	struct vec3 vecMagData;
 	struct vec3 vecAccData;
 	
-	struct vec3 vecDummy;
-	vecDummy.data[2] = 0.03179938779915;
-	vecDummy.data[1] = 0;
-	vecDummy.data[0] = 0;
-	
-	gyrUpdate(&vecGyrData);
+	gyrUpdate(&vecGyrData, &vecGyrOff);
 	mat3RotByGyr(&vecGyrData, &matOri, timeElapsed);
 	mat3Print(&matOri);
 	Serial.printf("\n\r");
 	Serial.send_now();
+
+
+	static int runsSinceOrthoFix = 0;
+	if (runsSinceOrthoFix >= ORTHO_FIX_INTERVAL) {
+		mat3OrthoFix(&matOri);
+		runsSinceOrthoFix = 0;
+	} else
+		runsSinceOrthoFix++;
 
 	//magUpdate(&vecMagData);
 	//accUpdate(&vecAccData);
