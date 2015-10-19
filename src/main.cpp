@@ -15,18 +15,16 @@
 #define GYR_SAD 0x6B
 #define GYR_SUB_ENABLE 0x20
 #define GYR_SUB_OUT (0x28|0x80) // initial register + incrementing output
-#define GYR_FREQUENCY 20
+#define GYR_FREQUENCY 50
 
 #define GYR_OFFSET_SAMPLES 100
 #define GYR_LSB_RAD 0.00015271630955 // / 10000
 
 #define SERIAL_BAUD 115200
 
-#define ORTHO_FIX_INTERVAL 20
+#define ORTHO_FIX_INTERVAL 10
 
 	
-static struct vec3 vecGyrOff;
-
 void magInit(void)
 {	
 	Wire.beginTransmission(MAG_SAD); // slave-address
@@ -149,7 +147,6 @@ void setup()
 	magInit();
 	gyrInit();
 	delay(1000);
-	gyrGetOffset(&vecGyrOff);
 }
 
 void loop()
@@ -159,9 +156,11 @@ void loop()
 	while(timeElapsed < 1.0f / GYR_FREQUENCY)
 		timeElapsed += timeSinceLastCall();
 	
-	static mat3 matOri;
+	static struct mat3 matOri;
+	static struct vec3 vecGyrOff;
 	static int firstRun = 1;
 	if (firstRun) {
+		gyrGetOffset(&vecGyrOff);
 		mat3Eyes(&matOri);
 		firstRun = 0;
 		Serial.printf("Doing stuff");
@@ -170,59 +169,60 @@ void loop()
 	struct vec3 vecGyrData;
 	struct vec3 vecMagData;
 	struct vec3 vecAccData;
+
 	
 	gyrUpdate(&vecGyrData, &vecGyrOff);
 	mat3RotByGyr(&vecGyrData, &matOri, timeElapsed);
+
+	struct vec3 vecUniVert;
+	struct vec3 vecOriVert;
+	struct mat3 matOriTran;
+	mat3Transpose(&matOri, &matOriTran);
+	vec3Set(&vecUniVert, 0, 0, 1);
+	mat3MultVec(&matOriTran, &vecUniVert, &vecOriVert);
+	//vec3Print(&vecOriVert);
+	//Serial.printf(" | ");
+
+	accUpdate(&vecAccData);
+	if (vec3Length(&vecAccData) > 12000) {
+		//Serial.printf("Accb: %3.2f ", vec3Length(&vecAccData));
+		vec3Norm(&vecAccData);
+		//Serial.printf("Acca: %3.2f ", vec3Length(&vecAccData));
+		//Serial.printf("vecOV: %3.2f ", vec3Length(&vecOriVert));
+		//vec3Print(&vecAccData);
+		//Serial.printf(" | ");
+		//Serial.printf("Orit: %3.2f ", mat3Det(&matOriTran));
+
+		float theta = vec3GetAng(&vecOriVert, &vecAccData);
+		//Serial.printf("Thet: %3.2f ", theta);
+		struct mat3 matRotFix;
+		mat3RotFromVecPair(&vecOriVert, &vecAccData, &matRotFix, theta / 100);
+		//Serial.printf("Rotfix: %3.2f ", mat3Det(&matRotFix));
+
+		mat3Transpose(&matRotFix, &matRotFix);
+		struct mat3 matOriFix;
+		mat3Mult(&matOri, &matRotFix, &matOriFix);
+		//Serial.printf("MatOrific: %3.2f ", mat3Det(&matOriFix));
+		mat3Transpose(&matOriFix, &matOriTran);
+		//mat3MultVec(&matOriTran, &vecUniVert, &vecOriVert);
+
+		matOri = matOriFix;
+		//Serial.printf(" | ");
+	//vec3Print(&vecOriVert);
+	//Serial.printf(" | ");
+	//Serial.printf("%f", theta);
+	//Serial.printf("\n\r");
+	}
+	//Serial.printf(" | ");
 	mat3Print(&matOri);
+
 	Serial.printf("\n\r");
 	Serial.send_now();
-
 
 	static int runsSinceOrthoFix = 0;
 	if (runsSinceOrthoFix >= ORTHO_FIX_INTERVAL) {
 		mat3OrthoFix(&matOri);
 		runsSinceOrthoFix = 0;
-	} else
-		runsSinceOrthoFix++;
-
-	//magUpdate(&vecMagData);
-	//accUpdate(&vecAccData);
-	
-	
-	
-	
-	/*
-	vec3Print(&vecAccData); 
-	Serial.printf(" ");
-	vec3Print(&vecMagData); 
-	Serial.printf(" ");
-	vec3Print(&vecGyrData); 
-	Serial.printf("\n\r");
-	*/
-	///Serial.printf("%f %f %f\n\r", accX, accY, accZ);
-
-	
-	//Serial.printf("Got the first\n\r");
-	//unsigned int XHA = Wire.read();
-	//unsigned int YLA = Wire.read();
-	//unsigned int YHA = Wire.read();
-	//unsigned int ZLA = Wire.read();
-	//unsigned int ZHA = Wire.read();
-	//Serial.printf("Received stuff\n\r");
-	//float accX = (int)(XHA | XLA);
-	//float accY = (int)(YHA | YLA);
-	//float accZ = (int)(ZHA | ZLA);
-	
-	
-	//Serial.printf("%d\n\r", XLA);
-	//Serial.printf("%f %f %f\n\r", accX, accY, accZ);
-	//Wire.requestFrom(0x32, 6, 1);
-	/*
-	static float rot = 0;
-	while (1) {
-		Serial.printf("%f 0 0\n\r", rot);
-		rot += PI / 100;
-		delay(100);
 	}
-	*/	
+	runsSinceOrthoFix++;
 }

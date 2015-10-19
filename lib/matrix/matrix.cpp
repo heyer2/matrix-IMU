@@ -2,6 +2,16 @@
 #include <matrix.h>
 #include "arduino.h"
 
+float constrain(float input, float min, float max)
+{
+	if (input > max)
+		return max;
+	else if (input < min)
+		return min;
+	else
+		return input;
+}
+
 void mat3Print(struct mat3 * mat)
 {
 	for (int i = 0; i < 9; i++)
@@ -10,7 +20,7 @@ void mat3Print(struct mat3 * mat)
 
 void vec3Print(struct vec3 * vec)
 {
-	Serial.printf("%f %f %f", vec->data[0], vec->data[1], vec->data[2]);
+	Serial.printf("% 5.3f % 5.3f % 5.3f", vec->data[0], vec->data[1], vec->data[2]);
 }
 
 void vec3MultFac(struct vec3 * vec, float k)
@@ -25,6 +35,13 @@ void vec3Zero(struct vec3 * vec)
 	vec->data[0] = 0;
 	vec->data[1] = 0;
 	vec->data[2] = 0;
+}
+
+void vec3Set(struct vec3 * vec, float x, float y, float z)
+{
+	vec->data[0] = x;
+	vec->data[1] = y;
+	vec->data[2] = z;	
 }
 
 void mat3Zero(struct mat3 * mat)
@@ -158,9 +175,14 @@ void vec3Add(struct vec3 * vecA, struct vec3 * vecB, struct vec3 * vecOut)
 	vecOut->data[2] = vecA->data[2] + vecB->data[2];
 }
 
+float vec3Length(struct vec3 * vec)
+{
+	return sqrt(vec3DotProd(vec, vec));
+}
+
 void vec3Norm(struct vec3 * vec)
 {
-	vec3MultFac(vec, 1.0f / sqrt(vec3DotProd(vec, vec)));
+	vec3MultFac(vec, 1 / vec3Length(vec));
 }
 
 
@@ -189,3 +211,59 @@ void mat3OrthoFix(struct mat3 * mat)
 	vec3CrossProd(&vecX, &vecY, &vecZ);
 	mat3SetColumn(&vecZ, mat, 2);
 }
+
+void mat3MultVec(struct mat3 * mat, struct vec3 * vecIn, struct vec3 * vecOut)
+{
+	struct vec3 vecTmp;
+	vec3Zero(&vecTmp);
+	for (int i = 0; i < 3; i++)
+		for (int j = 0; j < 3; j++)
+			vecTmp.data[i] += mat->data[i][j] * vecIn->data[j];
+	*vecOut = vecTmp;
+}
+
+void mat3Transpose(struct mat3 * matIn, struct mat3 * matOut)
+{	
+	struct mat3 matTmp = *matIn;
+	for (int i = 0; i < 3; i++)
+		for (int j = 0; j < 3; j++)
+			matTmp.data[i][j] = matIn->data[j][i];
+	*matOut = matTmp;
+}
+
+
+float vec3GetAng(struct vec3 * vecA, struct vec3 * vecB)
+{
+	//Serial.printf("vecA: %3.2f ", vec3Length(vecA));
+	//Serial.printf("vecB: %3.2f ", vec3Length(vecB));
+	float dotprod = vec3DotProd(vecA, vecB);
+	if (dotprod > 1.0f)
+		dotprod = 1.0f;
+	else if (dotprod < 0.0f)
+		dotprod = 0.0f;
+	return acos(dotprod);
+}
+
+void mat3RotFromVecPair(struct vec3 * vecA, struct vec3 * vecB, struct mat3 * matRot, float theta)
+{	
+	struct vec3 vecAxis;
+	vec3CrossProd(vecA, vecB, &vecAxis);
+	vec3Norm(&vecAxis);
+	mat3RotFromAxis(&vecAxis, matRot, theta);
+}
+
+float mat3Det(struct mat3 * mat)
+{
+	float result = 0;
+
+	result += mat->data[0][0] * mat->data[1][1] * mat->data[2][2];
+	result += mat->data[0][1] * mat->data[1][2] * mat->data[2][0];
+	result += mat->data[0][2] * mat->data[1][0] * mat->data[2][1];
+
+	result -= mat->data[0][1] * mat->data[1][0] * mat->data[2][2];
+	result -= mat->data[0][0] * mat->data[1][2] * mat->data[2][1];
+	result -= mat->data[0][2] * mat->data[1][1] * mat->data[2][0];	
+
+	return result;
+}
+
