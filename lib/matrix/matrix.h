@@ -12,7 +12,7 @@ struct vec3
 
 void mat3Print(struct mat3 * mat);
 void vec3Print(struct vec3 * vec);
-void vec3MultFac(struct vec3 * vec, float k);
+void vec3Mult(struct vec3 * vec, float k);
 void vec3Zero(struct vec3 * vec);
 void vec3Set(struct vec3 * vec, float x, float y, float z);
 void mat3Zero(struct mat3 * mat);
@@ -23,7 +23,7 @@ void mat3ExtractColumn(struct mat3 * mat, struct vec3 * vec, int col);
 void mat3ExtractRow(struct mat3 * mat, struct vec3 * vec, int row);
 void mat3SetColumn(struct vec3 * vec, struct mat3 * mat, int col);
 void mat3RotFromAxis(struct vec3 * vecAxis, struct mat3 * matRot, float theta); // Axis vector must be normalized
-void mat3RotByGyr(struct vec3 * vecVel, struct mat3 * matOri, float timeElapsed);
+void mat3GyrRot(struct vec3 * vecVel, struct mat3 * matOri, float timeElapsed);
 float vec3DotProd(struct vec3 * vecA, struct vec3 * vecB);
 void vec3CrossProd(struct vec3 * vecA, struct vec3 * vecB, struct vec3 * vecCross);
 void vec3Add(struct vec3 * vecA, struct vec3 * vecB, struct vec3 * vecOut);
@@ -36,3 +36,4 @@ float vec3GetAng(struct vec3 * vecA, struct vec3 * vecB); // Vectors must be nor
 void mat3RotFromVecPair(struct vec3 * vecA, struct vec3 * vecB, struct mat3 * matRot, float theta);
 float mat3Det(struct mat3 * mat);
 void mat3RotZ(struct mat3 *matRot, float theta);
+void vec3Accum(struct vec3 * vecAccum, struct vec3 * vecAdd);

@@ -2,6 +2,8 @@
 #include "Wire.h"
 #include <matrix.h>
 
+#define int16 short
+
 #define ACC_SAD 0x19
 #define ACC_SUB_SPEED 0x20
 #define ACC_SUB_OUT (0x28|0x80) // initial register + incrementing output
@@ -20,44 +22,178 @@
 #define MAG_GAIN_Y 0.00241234250943554
 #define MAG_GAIN_Z 0.00277519214826859
 
-#define GYR_SAD 					 0x6B
-#define GYR_SUB_INIT 				 0x20
-#define GYR_SUB_INIT_MASK_ENABLE 	 0x0F
-#define GYR_SUB_INIT_MASK_ODR_100HZ  0x00
-#define GYR_SUB_INIT_MASK_ODR_200HZ  0x40
-#define GYR_SUB_INIT_MASK_ODR_400HZ  0x80
-#define GYR_SUB_INIT_MASK_ODR_800HZ  0xC0
-#define GYR_SUB_INIT_MASK_BW_LOWEST  0x00
-#define GYR_SUB_INIT_MASK_BW_LOW 	 0x01
-#define GYR_SUB_INIT_MASK_BW_HIGH 	 0x02
-#define GYR_SUB_INIT_MASK_BW_HIGHEST 0x03
+#define GYR_SAD 0x6B
 
-#define GYR_SUB_OUT (0x28|0x80) // initial register + incrementing output
-#define GYR_SUB_STATUS 0x27
+#define GYR_SUB_CTRL1 				  0x20
+#define GYR_SUB_CTRL1_MASK_ODR_100HZ  0x00
+#define GYR_SUB_CTRL1_MASK_ODR_200HZ  0x40
+#define GYR_SUB_CTRL1_MASK_ODR_400HZ  0x80
+#define GYR_SUB_CTRL1_MASK_ODR_800HZ  0xC0
+#define GYR_SUB_CTRL1_MASK_BW_LOWEST  0x00
+#define GYR_SUB_CTRL1_MASK_BW_LOW 	  0x01
+#define GYR_SUB_CTRL1_MASK_BW_HIGH 	  0x02
+#define GYR_SUB_CTRL1_MASK_BW_HIGHEST 0x03
+#define GYR_SUB_CTRL1_MASK_ENABLE 	  0x0F
+
+#define GYR_SUB_CTRL4 				     0x23
+#define GYR_SUB_CTRL4_MASK_SCALE_245DPS  0x00
+#define GYR_SUB_CTRL4_MASK_SCALE_500DPS  0x10
+#define GYR_SUB_CTRL4_MASK_SCALE_2000DPS 0x20
+
+#define GYR_SUB_OUT 0x28 // Initial register, use incrementing read
+
+#define GYR_SUB_STATUS 			   0x27
 #define GYR_SUB_STATUS_MASK_NEWSET 0x04
 
+#define GYR_LSB_RAD_245DPS  0.0001527163095
+#define GYR_LSB_RAD_500DPS  0.0003054326190
+#define GYR_LSB_RAD_2000DPS 0.0012217304764
 
-//useless
-#define GYR_FREQUENCY 1000
-
-
-#define GYR_OFFSET_SAMPLES 1000
-#define GYR_LSB_RAD 0.00015271630955 // / 10000
+#define GYR_BIAS_SAMPLES 1000
 
 #define SERIAL_BAUD 115200
 
 #define ORTHO_FIX_INTERVAL 10000
 
+#define MILLIS2SEC 0.001;
 
-/*
-struct gyr {
-	int newSet;
-	struct vec3 vecData;
-	enum ODR {100HZ, 200HZ, 300HZ, 400HZ} ODR;
-	enum BW {LOWEST, LOW, HIGH, HIGHEST} BW;
-	enum SCALE {245DPS, 500DPS, 2000DPS} SCALE;
+enum outputRate {HZ_100, HZ_200, HZ_400, HZ_800};
+enum bandWidth {BW_LOWEST, BW_LOW, BW_HIGH, BW_HIGHEST};
+enum fullScale {DPS_245, DPS_500, DPS_2000};
+
+struct gyro {
+	int flagNewAvail;
+	int timeUsed;
+	struct vec3 vecVel;
+	struct vec3 vecBias;
+	enum outputRate ODR;
+	enum bandWidth BW;
+	enum fullScale FS;
+};
+
+void I2CWriteReg(char SAD, char SUB, char byte)
+{
+	Wire.beginTransmission(SAD);
+	Wire.write(SUB);
+	Wire.write(byte);
+	Wire.endTransmission();
 }
-*/
+
+char I2CReadReg(char SAD, char SUB)
+{	
+	Wire.beginTransmission(SAD);
+	Wire.write(SUB);
+	Wire.endTransmission(0);
+	Wire.requestFrom(SAD, 1);
+	char test = Wire.read();
+	return test;
+}
+
+void I2CReadRegSeries(char SAD, char SUB, int bytes) // Will hold the line until all read
+{	
+	Wire.beginTransmission(SAD);
+	Wire.write(SUB | 0x80); // 0x80 activates pointer incrementation
+	Wire.endTransmission(1);
+	Wire.requestFrom(SAD, bytes);
+}
+
+void gyrSetDefault(struct gyro * gyr) 
+{
+	gyr->ODR = HZ_400;
+	gyr->BW  = BW_HIGHEST;
+	gyr->FS  = DPS_2000;
+
+	vec3Zero(&gyr->vecBias);
+	vec3Zero(&gyr->vecVel);
+}
+
+void gyrApply(struct gyro * gyr)
+{	
+	char byte = 0x00;
+
+	switch(gyr->ODR) {
+		case HZ_100: byte |= GYR_SUB_CTRL1_MASK_ODR_100HZ; break;
+		case HZ_200: byte |= GYR_SUB_CTRL1_MASK_ODR_200HZ; break;
+		case HZ_400: byte |= GYR_SUB_CTRL1_MASK_ODR_400HZ; break;
+		case HZ_800: byte |= GYR_SUB_CTRL1_MASK_ODR_800HZ; break;
+	}
+
+	switch(gyr->BW) {
+		case BW_LOWEST : byte |= GYR_SUB_CTRL1_MASK_BW_LOWEST ; break;
+		case BW_LOW    : byte |= GYR_SUB_CTRL1_MASK_BW_LOW    ; break;
+		case BW_HIGH   : byte |= GYR_SUB_CTRL1_MASK_BW_HIGH   ; break;
+		case BW_HIGHEST: byte |= GYR_SUB_CTRL1_MASK_BW_HIGHEST; break;
+	}
+
+	byte |= GYR_SUB_CTRL1_MASK_ENABLE; // This should be made optional later
+
+	I2CWriteReg(GYR_SAD, GYR_SUB_CTRL1, byte);
+
+	byte = 0x00;
+
+	switch(gyr->FS) {
+		case DPS_245 : byte |= GYR_SUB_CTRL4_MASK_SCALE_245DPS ; break;
+		case DPS_500 : byte |= GYR_SUB_CTRL4_MASK_SCALE_500DPS ; break;
+		case DPS_2000: byte |= GYR_SUB_CTRL4_MASK_SCALE_2000DPS; break;
+	}
+
+	I2CWriteReg(GYR_SAD, GYR_SUB_CTRL4, byte);
+}
+
+void gyrGetAvailability(struct gyro * gyr)
+{	
+	char byte = I2CReadReg(GYR_SAD, GYR_SUB_STATUS);
+	gyr->flagNewAvail = (byte & GYR_SUB_STATUS_MASK_NEWSET) > 0;
+}
+
+void gyrUpdate(struct gyro * gyr)
+{	
+	I2CReadRegSeries(GYR_SAD, GYR_SUB_OUT, 6);
+	unsigned int XL = Wire.read();
+	unsigned int XH = Wire.read();
+	unsigned int YL = Wire.read();
+	unsigned int YH = Wire.read();
+	unsigned int ZL = Wire.read();
+	unsigned int ZH = Wire.read();	
+	
+	gyr->vecVel.data[0] = (int16)(XH << 8 | XL);
+	gyr->vecVel.data[1] = (int16)(YH << 8 | YL);
+	gyr->vecVel.data[2] = (int16)(ZH << 8 | ZL);
+	
+	switch(gyr->FS) {
+		case DPS_245 : vec3Mult(&gyr->vecVel, GYR_LSB_RAD_245DPS) ; break;
+		case DPS_500 : vec3Mult(&gyr->vecVel, GYR_LSB_RAD_500DPS) ; break;
+		case DPS_2000: vec3Mult(&gyr->vecVel, GYR_LSB_RAD_2000DPS); break;
+	}
+
+	vec3Accum(&gyr->vecVel, &gyr->vecBias);
+
+	gyr->flagNewAvail = 0;
+}
+
+void gyrGetBias(struct gyro * gyr)
+{	
+	struct vec3 vecTmp;
+	vec3Zero(&vecTmp);
+	vec3Zero(&gyr->vecBias);
+	
+	for (int i = 0; i < GYR_BIAS_SAMPLES; i++) {
+		while(!gyr->flagNewAvail)
+			gyrGetAvailability(gyr);
+		gyrUpdate(gyr);
+		vec3Accum(&vecTmp, &gyr->vecVel);
+	}
+	vec3Mult(&vecTmp, -1.0f / GYR_BIAS_SAMPLES);
+	gyr->vecBias = vecTmp;
+}
+
+float gyrTimeSinceUse(struct gyro * gyr, int update)
+{	
+	int millisElapsed = millis() - gyr->timeUsed;
+	if (update)
+		gyr->timeUsed += millisElapsed;
+	return millisElapsed * MILLIS2SEC;
+}
 
 void magInit(void)
 {	
@@ -83,62 +219,6 @@ void accInit(void)
 	Wire.write(ACC_SUB_SPEED); // sub-address
 	Wire.write(0x57); // 100hz, all enable, normal power
 	Wire.endTransmission(1);
-}
-
-int gyrInit(int ODR)
-{	
-	char byte = 0x00;
-
-	byte |= GYR_SUB_INIT_MASK_ENABLE;
-	byte |= GYR_SUB_INIT_MASK_BW_HIGHEST; // Not much reason to go lower
-
-	if (ODR == 100)
-		byte |= GYR_SUB_INIT_MASK_ODR_100HZ;
-	else if (ODR == 200)
-		byte |= GYR_SUB_INIT_MASK_ODR_200HZ;
-	else if (ODR == 400)
-		byte |= GYR_SUB_INIT_MASK_ODR_400HZ;
-	else if (ODR == 800)
-		byte |= GYR_SUB_INIT_MASK_ODR_800HZ;
-	else
-		return 0;
-
-	Wire.beginTransmission(GYR_SAD);
-	Wire.write(GYR_SUB_INIT);
-	Wire.write(byte);
-	Wire.endTransmission(1);
-	return 1;
-}
-
-void gyrUpdate(struct vec3 * vec, struct vec3 * vecBias)
-{
-	Wire.beginTransmission(GYR_SAD);
-	Wire.write(GYR_SUB_OUT);
-	Wire.endTransmission(0);
-	Wire.requestFrom(GYR_SAD, 6);
-	unsigned int XL = Wire.read();
-	unsigned int XH = Wire.read();
-	unsigned int YL = Wire.read();
-	unsigned int YH = Wire.read();
-	unsigned int ZL = Wire.read();
-	unsigned int ZH = Wire.read();	
-	
-	vec->data[0] = (short)(XH << 8 | XL);
-	vec->data[1] = (short)(YH << 8 | YL);
-	vec->data[2] = (short)(ZH << 8 | ZL);
-	
-	vec3MultFac(vec, GYR_LSB_RAD);
-	vec3Add(vecBias, vec, vec);
-}
-
-int gyrAvailable()
-{
-	Wire.beginTransmission(GYR_SAD);
-	Wire.write(GYR_SUB_STATUS);
-	Wire.endTransmission(0);
-	Wire.requestFrom(GYR_SAD, 1);
-	char status = Wire.read();
-	return status & GYR_SUB_STATUS_MASK_NEWSET;
 }
 
 void accUpdate(struct vec3 * vec)
@@ -187,111 +267,34 @@ void magUpdate(struct vec3 * vec)
 	vec->data[2] = (vec->data[2] - MAG_BIAS_Z) * MAG_GAIN_Z;
 }	
 
-void gyrGetOffset(struct vec3 * vecBias)
-{	
-	struct vec3 vecTmp;
-	struct vec3 vecZero;
-	vec3Zero(&vecZero);
-	vec3Zero(vecBias);
-	for (int i = 0; i < GYR_OFFSET_SAMPLES; i++) {
-		gyrUpdate(&vecTmp, &vecZero);
-		vec3Add(&vecTmp, vecBias, vecBias);
-		delay(1000.0f / GYR_FREQUENCY);
-	}
-	vec3MultFac(vecBias, -1.0f / GYR_OFFSET_SAMPLES);
-}
-
-float timeSinceLastCall()
-{	
-	static int timeOld;
-	int timeNew = millis();
-	int timeElapsed = timeNew - timeOld;
-	timeOld = timeNew;
-	return (float)timeElapsed / 1000;
-}
-
 void setup()
 {
 	Serial.begin(SERIAL_BAUD);
 	Wire.begin();
-	accInit();
-	magInit();
-	gyrInit(800);
-	delay(1000);
+	delay(1500); // For debugging only
 }
 
 void loop()
 {	
-	static float timeElapsed;
-	timeElapsed = timeSinceLastCall();
-	while(timeElapsed < 1.0f / GYR_FREQUENCY)
-		timeElapsed += timeSinceLastCall();
-	
-	struct vec3 vecGyrData;
-	struct vec3 vecMagData;
-	struct vec3 vecAccData;
+	static struct gyro gyr;
 	static struct mat3 matOri;
-	static struct vec3 vecGyrBias;
-	static float accGravSize;
-	static int firstRun = 1;
-	if (firstRun) {
-		gyrGetOffset(&vecGyrBias);
-		accUpdate(&vecAccData);
-		accGravSize = vec3Length(&vecAccData);
+
+	static int flagFirstRun = 1;
+	if (flagFirstRun) {
+		gyrSetDefault(&gyr);
+		gyrApply(&gyr);
+		gyrGetBias(&gyr);
 		mat3Eyes(&matOri);
-		firstRun = 0;
+		flagFirstRun = 0;
 	}
-	while (!gyrAvailable());
-	gyrUpdate(&vecGyrData, &vecGyrBias);
-	//vec3Print(&vecGyrData);
-	//Serial.printf(" After: %i ", gyrAvailable()); 
-	mat3RotByGyr(&vecGyrData, &matOri, timeElapsed);
-	
-
-
-	//vec3Print(&vecOriVert);
-	//Serial.printf(" | ");
-	/*
-	accUpdate(&vecAccData);
-	
-	if (accGetDeviation(&vecAccData, accGravSize) < 0.3) {
-		struct vec3 vecVert;
-		mat3ExtractRow(&matOri, &vecVert, 2);
-		vec3Norm(&vecAccData); 
-		float theta = vec3GetAng(&vecVert, &vecAccData);
-		struct mat3 matRotFix;
-		mat3RotFromVecPair(&vecVert, &vecAccData, &matRotFix, -theta / 100);
-		mat3Mult(&matOri, &matRotFix, &matOri);
-	}
-
-	magUpdate(&vecMagData);
-	struct vec3 vecOriNorth;
-	mat3MultVec(&matOri, &vecMagData, &vecOriNorth);
-	float theta = atan2(vecOriNorth.data[1], vecOriNorth.data[0]);
-	struct mat3 matRotFix;
-	mat3RotZ(&matRotFix, -theta / 20);
-	mat3Mult(&matRotFix, &matOri, &matOri);
-	*/
-	
-	//mat3Print(&matOri);
-	//Serial.send_now();
-	//vec3Print(&vecGyrData);
-	//Serial.printf("Det: %9.8f ", mat3Det(&matOri));
-	//Serial.write((char*)&matOri, 4*9);
-	
-	//mat3Print(&matOri)
-	//vec3MultFac(&vecGyrData, 57.29577951308233);
-	//vec3Print(&vecGyrData);
+	//Serial.printf("All good");
+	while(!gyr.flagNewAvail)
+		gyrGetAvailability(&gyr);
+	//Serial.printf("All good 2");
+	gyrUpdate(&gyr);
+	//vec3Print(&gyr.vecVel);
+	mat3GyrRot(&gyr.vecVel, &matOri, gyrTimeSinceUse(&gyr, 1));
+	mat3Print(&matOri);
 	Serial.printf("\n\r");
 	Serial.send_now();
-
-	
-	static int runsSinceOrthoFix = 0;
-	if (runsSinceOrthoFix >= ORTHO_FIX_INTERVAL) {
-		//Serial.printf("Det: %4.3f ", mat3Det(&matOri));
-		//Serial.printf("\n\r");
-		//mat3OrthoFix(&matOri);
-		runsSinceOrthoFix = 0;
-	}
-	runsSinceOrthoFix++;
 }
