@@ -2,7 +2,7 @@
 #include <matrix.h>
 #include "arduino.h"
 
-float constrain(float input, float min, float max)
+static float limit(float input, float min, float max)
 {
 	if (input > max)
 		return max;
@@ -14,8 +14,10 @@ float constrain(float input, float min, float max)
 
 void mat3Print(struct mat3 * mat)
 {
-	for (int i = 0; i < 9; i++)
-		Serial.printf("%f ", *((float*)mat->data + i));
+	Serial.printf("%4.3f %4.3f %4.3f %4.3f %4.3f %4.3f %4.3f %4.3f %4.3f",
+					     mat->data[0][0], mat->data[0][1], mat->data[0][2],
+					     mat->data[1][0], mat->data[1][1], mat->data[1][2],
+					     mat->data[2][0], mat->data[2][1], mat->data[2][2]);
 }
 
 void vec3Print(struct vec3 * vec)
@@ -58,13 +60,6 @@ void mat3Eyes(struct mat3 * mat)
 	mat->data[2][2] = 1;
 }
 
-void mat3SetRow(int row, struct mat3 * mat, float a, float b, float c)
-{
-	mat->data[row][0] = a;
-	mat->data[row][1] = b;
-	mat->data[row][2] = c;
-}
-
 void mat3Mult(struct mat3 * matA, struct mat3 * matB, struct mat3 * matOut)
 {	
 	struct mat3 matTmp;
@@ -84,11 +79,25 @@ void mat3ExtractColumn(struct mat3 * mat, struct vec3 * vec, int col)
 	vec->data[2] = mat->data[2][col];
 }
 
+void mat3ExtractRow(struct mat3 * mat, struct vec3 * vec, int row)
+{
+	vec->data[0] = mat->data[row][0];
+	vec->data[1] = mat->data[row][1];
+	vec->data[2] = mat->data[row][2];
+}
+
 void mat3SetColumn(struct vec3 * vec, struct mat3 * mat, int col)
 {
 	mat->data[0][col] = vec->data[0];
 	mat->data[1][col] = vec->data[1];
 	mat->data[2][col] = vec->data[2];
+}
+
+void mat3SetRow(int row, struct mat3 * mat, float a, float b, float c)
+{
+	mat->data[row][0] = a;
+	mat->data[row][1] = b;
+	mat->data[row][2] = c;
 }
 
 void mat3RotFromAxis(struct vec3 * vecAxis, struct mat3 * matRot, float theta)
@@ -108,9 +117,85 @@ void mat3RotFromAxis(struct vec3 * vecAxis, struct mat3 * matRot, float theta)
 	matRot->data[2][2] = cosTheta + vecAxis->data[2] * vecAxis->data[2] * oneMinusCos;
 }
 
+void vec3AddMultFac(struct vec3 * vecIn, struct vec3 * vecOut, float k)
+{
+	vecOut->data[0] += vecIn->data[0] * k;
+	vecOut->data[1] += vecIn->data[1] * k;
+	vecOut->data[2] += vecIn->data[2] * k;
+}
+
+void mat3RotAxisX(struct mat3 * mat, float theta)
+{
+	struct vec3 vecY;
+	struct vec3 vecZ;
+	mat3ExtractColumn(mat, &vecY, 1);
+	mat3ExtractColumn(mat, &vecZ, 2);
+
+	struct vec3 vecTmp;
+
+	float cosTheta = 1 - theta * theta * 0.5;
+	float sinTheta = theta;
+
+	vec3Zero(&vecTmp);
+	vec3AddMultFac(&vecY, &vecTmp, cosTheta);
+	vec3AddMultFac(&vecZ, &vecTmp, sinTheta);
+	mat3SetColumn(&vecTmp, mat, 1);
+
+	vec3Zero(&vecTmp);
+	vec3AddMultFac(&vecY, &vecTmp, -sinTheta);
+	vec3AddMultFac(&vecZ, &vecTmp, cosTheta);
+	mat3SetColumn(&vecTmp, mat, 2);
+}
+
+void mat3RotAxisY(struct mat3 * mat, float theta)
+{	
+	struct vec3 vecX;
+	struct vec3 vecZ;
+	mat3ExtractColumn(mat, &vecX, 0);
+	mat3ExtractColumn(mat, &vecZ, 2);
+
+	struct vec3 vecTmp;
+
+	float cosTheta = 1 - theta * theta * 0.5;
+	float sinTheta = theta;
+
+	vec3Zero(&vecTmp);
+	vec3AddMultFac(&vecX, &vecTmp, cosTheta);
+	vec3AddMultFac(&vecZ, &vecTmp, -sinTheta);
+	mat3SetColumn(&vecTmp, mat, 0);
+
+	vec3Zero(&vecTmp);
+	vec3AddMultFac(&vecX, &vecTmp, sinTheta);
+	vec3AddMultFac(&vecZ, &vecTmp, cosTheta);
+	mat3SetColumn(&vecTmp, mat, 2);
+}
+
+void mat3RotAxisZ(struct mat3 * mat, float theta)
+{
+	struct vec3 vecX;
+	struct vec3 vecY;
+	mat3ExtractColumn(mat, &vecX, 0);
+	mat3ExtractColumn(mat, &vecY, 1);
+
+	struct vec3 vecTmp;
+
+	float cosTheta = 1 - theta * theta * 0.5;
+	float sinTheta = theta;
+
+	vec3Zero(&vecTmp);
+	vec3AddMultFac(&vecX, &vecTmp, cosTheta);
+	vec3AddMultFac(&vecY, &vecTmp, sinTheta);
+	mat3SetColumn(&vecTmp, mat, 0);
+
+	vec3Zero(&vecTmp);
+	vec3AddMultFac(&vecX, &vecTmp, -sinTheta);
+	vec3AddMultFac(&vecY, &vecTmp, cosTheta);
+	mat3SetColumn(&vecTmp, mat, 1);
+}
 
 void mat3RotByGyr(struct vec3 * vecVel, struct mat3 * matOri, float timeElapsed)
 {	
+	/*
 	struct mat3 matRotX;
 	struct mat3 matRotY;
 	struct mat3 matRotZ;
@@ -129,32 +214,13 @@ void mat3RotByGyr(struct vec3 * vecVel, struct mat3 * matOri, float timeElapsed)
 	mat3Mult(&matRotX, matOri, matOri);
 	mat3Mult(&matRotY, matOri, matOri);
 	mat3Mult(&matRotZ, matOri, matOri);
-	
-	/*
-	struct vec3 vecRot = *vecVel;
-	vec3MultFac(&vecRot, timeElapsed);
-	
-	struct mat3 matRotX;
-	struct mat3 matRotY;
-	struct mat3 matRotZ;
-	
-	mat3SetRow(0, &matRotX, 1, 0, 0);
-	mat3SetRow(1, &matRotX, 0, cos(vecRot.data[0]), -sin(vecRot.data[0]));
-	mat3SetRow(2, &matRotX, 0, sin(vecRot.data[0]),  cos(vecRot.data[0]));
-	
-	mat3SetRow(0, &matRotY,  cos(vecRot.data[1]), 0, sin(vecRot.data[1]));
-	mat3SetRow(1, &matRotY, 0, 1, 0);
-	mat3SetRow(2, &matRotY, -sin(vecRot.data[1]), 0, cos(vecRot.data[1]));
-	
-	mat3SetRow(0, &matRotZ, cos(vecRot.data[2]), -sin(vecRot.data[2]), 0);
-	mat3SetRow(1, &matRotZ, sin(vecRot.data[2]),  cos(vecRot.data[2]), 0);
-	mat3SetRow(2, &matRotZ, 0, 0, 1);
-	
-	mat3Mult(&matRotX, matOri, matOri);
-	mat3Mult(&matRotY, matOri, matOri);
-	mat3Mult(&matRotZ, matOri, matOri);
 	*/
+
+	mat3RotAxisX(matOri, vecVel->data[0] * timeElapsed);
+	mat3RotAxisY(matOri, vecVel->data[1] * timeElapsed);
+	mat3RotAxisZ(matOri, vecVel->data[2] * timeElapsed);
 }
+
 
 float vec3DotProd(struct vec3 * vecA, struct vec3 * vecB)
 {
@@ -234,14 +300,7 @@ void mat3Transpose(struct mat3 * matIn, struct mat3 * matOut)
 
 float vec3GetAng(struct vec3 * vecA, struct vec3 * vecB)
 {
-	//Serial.printf("vecA: %3.2f ", vec3Length(vecA));
-	//Serial.printf("vecB: %3.2f ", vec3Length(vecB));
-	float dotprod = vec3DotProd(vecA, vecB);
-	if (dotprod > 1.0f)
-		dotprod = 1.0f;
-	else if (dotprod < 0.0f)
-		dotprod = 0.0f;
-	return acos(dotprod);
+	return acos(limit(vec3DotProd(vecA, vecB), 0, 1));
 }
 
 void mat3RotFromVecPair(struct vec3 * vecA, struct vec3 * vecB, struct mat3 * matRot, float theta)
@@ -265,5 +324,12 @@ float mat3Det(struct mat3 * mat)
 	result -= mat->data[0][2] * mat->data[1][1] * mat->data[2][0];	
 
 	return result;
+}
+
+void mat3RotZ(struct mat3 * matRot, float theta)
+{
+	mat3SetRow(0, matRot, cos(theta), -sin(theta), 0);
+	mat3SetRow(1, matRot, sin(theta),  cos(theta), 0);
+	mat3SetRow(2, matRot, 0, 0, 1);
 }
 
