@@ -14,7 +14,7 @@ static float limit(float input, float min, float max)
 
 void vec3Print(struct vec3 * vec)
 {
-	Serial.printf("% 5.3f % 5.3f % 5.3f", vec->data[0], vec->data[1], vec->data[2]);
+	Serial.printf("% 8.6f % 8.6f % 8.6f", vec->data[0], vec->data[1], vec->data[2]);
 }
 
 void vec3Zero(struct vec3 * vec)
@@ -275,6 +275,42 @@ void mat3GyrRot(struct vec3 * vecVel, struct mat3 * matOri, float timeElapsed)
 	mat3RotAxisZ(matOri, vecVel->data[2] * timeElapsed);
 }
 
+void mat3AccAlign(struct vec3 * vecAcc, struct mat3 * matOri, float weight, float max)
+{		
+		struct vec3 vecZ;
+		struct vec3 vecTmp;
+		mat3ExtractRow(matOri, &vecZ, 2);
+		vecTmp = *vecAcc;
+		vec3Norm(&vecTmp); //Removing this would make the angle slightly wrong, since A.B  = cos(theta)*||A|B|
+
+		float theta = vec3GetAng(&vecZ, &vecTmp);
+		theta = limit(theta * weight, -max, max); // Albeit theta can only be positive
+
+		struct mat3 matRotAlign;
+		mat3RotFromVecPair(&vecZ, &vecTmp, &matRotAlign, -theta); // Negation can be removed by switching inputs to crossproduct
+		mat3Mult(matOri, &matRotAlign, matOri);
+}
+
+void mat3RotZ(struct mat3 * matRot, float theta)
+{
+	mat3SetRowMan(0, matRot, cos(theta), -sin(theta), 0);
+	mat3SetRowMan(1, matRot, sin(theta),  cos(theta), 0);
+	mat3SetRowMan(2, matRot, 0, 0, 1);
+}
+
+void mat3MagAlign(struct vec3 * vecMag, struct mat3 * matOri, float weight, float max)
+{	
+	struct vec3 vecNorth;
+	mat3MultVec(matOri, vecMag, &vecNorth);
+
+	float theta = atan2(vecNorth.data[1], vecNorth.data[0]);
+	theta = limit(theta * weight, -max, max);
+
+	struct mat3 matRotAlign;
+	mat3RotZ(&matRotAlign, -theta);
+	mat3Mult(&matRotAlign, matOri, matOri);
+}
+
 void mat3OrthoFix(struct mat3 * mat)
 {
 	struct vec3 vecOldX;
@@ -309,10 +345,4 @@ void mat3RotFromVecPair(struct vec3 * vecA, struct vec3 * vecB, struct mat3 * ma
 	mat3RotFromAxis(&vecAxis, matRot, theta);
 }
 
-void mat3RotZ(struct mat3 * matRot, float theta)
-{
-	mat3SetRowMan(0, matRot, cos(theta), -sin(theta), 0);
-	mat3SetRowMan(1, matRot, sin(theta),  cos(theta), 0);
-	mat3SetRowMan(2, matRot, 0, 0, 1);
-}
 
