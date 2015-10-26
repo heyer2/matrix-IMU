@@ -52,11 +52,11 @@ void vec3Accum(struct vec3 * vecAccum, struct vec3 * vecAdd)
 	vecAccum->data[2] += vecAdd->data[2];
 }
 
-void vec3AccumMult(struct vec3 * vecIn, struct vec3 * vecOut, float k)
+void vec3AccumMult(struct vec3 * vecAccum, struct vec3 * vecAdd, float k)
 {
-	vecOut->data[0] += vecIn->data[0] * k;
-	vecOut->data[1] += vecIn->data[1] * k;
-	vecOut->data[2] += vecIn->data[2] * k;
+	vecAccum->data[0] += vecAdd->data[0] * k;
+	vecAccum->data[1] += vecAdd->data[1] * k;
+	vecAccum->data[2] += vecAdd->data[2] * k;
 }
 
 float vec3DotProd(struct vec3 * vecA, struct vec3 * vecB)
@@ -182,6 +182,82 @@ float mat3Det(struct mat3 * mat)
 	return result;
 }
 
+void mat3RotAxisX(struct mat3 * mat, float theta)
+{
+	struct vec3 vecY;
+	struct vec3 vecZ;
+	mat3ExtractColumn(mat, &vecY, 1);
+	mat3ExtractColumn(mat, &vecZ, 2);
+
+	struct vec3 vecTmp;
+
+	float cosTheta = 1 - theta * theta * 0.5;
+	float sinTheta = theta;
+
+	vec3Zero(&vecTmp);
+	vec3AccumMult(&vecTmp, &vecY, cosTheta);
+	vec3AccumMult(&vecTmp, &vecZ, sinTheta);
+	mat3SetColumn(&vecTmp, mat, 1);
+
+	vec3Zero(&vecTmp);
+	vec3AccumMult(&vecTmp, &vecY, -sinTheta);
+	vec3AccumMult(&vecTmp, &vecZ,  cosTheta);
+	mat3SetColumn(&vecTmp, mat, 2);
+}
+
+void mat3RotAxisY(struct mat3 * mat, float theta)
+{	
+	struct vec3 vecX;
+	struct vec3 vecZ;
+	mat3ExtractColumn(mat, &vecX, 0);
+	mat3ExtractColumn(mat, &vecZ, 2);
+
+	struct vec3 vecTmp;
+
+	float cosTheta = 1 - theta * theta * 0.5;
+	float sinTheta = theta;
+
+	vec3Zero(&vecTmp);
+	vec3AccumMult(&vecTmp, &vecX,  cosTheta);
+	vec3AccumMult(&vecTmp, &vecZ, -sinTheta);
+	mat3SetColumn(&vecTmp, mat, 0);
+
+	vec3Zero(&vecTmp);
+	vec3AccumMult(&vecTmp, &vecX, sinTheta);
+	vec3AccumMult(&vecTmp, &vecZ, cosTheta);
+	mat3SetColumn(&vecTmp, mat, 2);
+}
+
+void mat3RotAxisZ(struct mat3 * mat, float theta)
+{
+	struct vec3 vecX;
+	struct vec3 vecY;
+	mat3ExtractColumn(mat, &vecX, 0);
+	mat3ExtractColumn(mat, &vecY, 1);
+
+	struct vec3 vecTmp;
+
+	float cosTheta = 1 - theta * theta * 0.5;
+	float sinTheta = theta;
+
+	vec3Zero(&vecTmp);
+	vec3AccumMult(&vecTmp, &vecX, cosTheta);
+	vec3AccumMult(&vecTmp, &vecY, sinTheta);
+	mat3SetColumn(&vecTmp, mat, 0);
+
+	vec3Zero(&vecTmp);
+	vec3AccumMult(&vecTmp, &vecX, -sinTheta);
+	vec3AccumMult(&vecTmp, &vecY,  cosTheta);
+	mat3SetColumn(&vecTmp, mat, 1);
+}
+
+void mat3GyrRot(struct vec3 * vecVel, struct mat3 * matOri, float timeElapsed)
+{	
+	mat3RotAxisX(matOri, vecVel->data[0] * timeElapsed);
+	mat3RotAxisY(matOri, vecVel->data[1] * timeElapsed);
+	mat3RotAxisZ(matOri, vecVel->data[2] * timeElapsed);
+}
+
 void mat3RotFromAxis(struct vec3 * vecAxis, struct mat3 * matRot, float theta)
 {	
 	float cosTheta = cos(theta);
@@ -199,80 +275,12 @@ void mat3RotFromAxis(struct vec3 * vecAxis, struct mat3 * matRot, float theta)
 	matRot->data[2][2] = cosTheta + vecAxis->data[2] * vecAxis->data[2] * oneMinusCos;
 }
 
-void mat3RotAxisX(struct mat3 * mat, float theta)
-{
-	struct vec3 vecY;
-	struct vec3 vecZ;
-	mat3ExtractColumn(mat, &vecY, 1);
-	mat3ExtractColumn(mat, &vecZ, 2);
-
-	struct vec3 vecTmp;
-
-	float cosTheta = 1 - theta * theta * 0.5;
-	float sinTheta = theta;
-
-	vec3Zero(&vecTmp);
-	vec3AccumMult(&vecY, &vecTmp, cosTheta);
-	vec3AccumMult(&vecZ, &vecTmp, sinTheta);
-	mat3SetColumn(&vecTmp, mat, 1);
-
-	vec3Zero(&vecTmp);
-	vec3AccumMult(&vecY, &vecTmp, -sinTheta);
-	vec3AccumMult(&vecZ, &vecTmp, cosTheta);
-	mat3SetColumn(&vecTmp, mat, 2);
-}
-
-void mat3RotAxisY(struct mat3 * mat, float theta)
+void mat3RotFromVecPair(struct vec3 * vecA, struct vec3 * vecB, struct mat3 * matRot, float theta)
 {	
-	struct vec3 vecX;
-	struct vec3 vecZ;
-	mat3ExtractColumn(mat, &vecX, 0);
-	mat3ExtractColumn(mat, &vecZ, 2);
-
-	struct vec3 vecTmp;
-
-	float cosTheta = 1 - theta * theta * 0.5;
-	float sinTheta = theta;
-
-	vec3Zero(&vecTmp);
-	vec3AccumMult(&vecX, &vecTmp, cosTheta);
-	vec3AccumMult(&vecZ, &vecTmp, -sinTheta);
-	mat3SetColumn(&vecTmp, mat, 0);
-
-	vec3Zero(&vecTmp);
-	vec3AccumMult(&vecX, &vecTmp, sinTheta);
-	vec3AccumMult(&vecZ, &vecTmp, cosTheta);
-	mat3SetColumn(&vecTmp, mat, 2);
-}
-
-void mat3RotAxisZ(struct mat3 * mat, float theta)
-{
-	struct vec3 vecX;
-	struct vec3 vecY;
-	mat3ExtractColumn(mat, &vecX, 0);
-	mat3ExtractColumn(mat, &vecY, 1);
-
-	struct vec3 vecTmp;
-
-	float cosTheta = 1 - theta * theta * 0.5;
-	float sinTheta = theta;
-
-	vec3Zero(&vecTmp);
-	vec3AccumMult(&vecX, &vecTmp, cosTheta);
-	vec3AccumMult(&vecY, &vecTmp, sinTheta);
-	mat3SetColumn(&vecTmp, mat, 0);
-
-	vec3Zero(&vecTmp);
-	vec3AccumMult(&vecX, &vecTmp, -sinTheta);
-	vec3AccumMult(&vecY, &vecTmp, cosTheta);
-	mat3SetColumn(&vecTmp, mat, 1);
-}
-
-void mat3GyrRot(struct vec3 * vecVel, struct mat3 * matOri, float timeElapsed)
-{	
-	mat3RotAxisX(matOri, vecVel->data[0] * timeElapsed);
-	mat3RotAxisY(matOri, vecVel->data[1] * timeElapsed);
-	mat3RotAxisZ(matOri, vecVel->data[2] * timeElapsed);
+	struct vec3 vecAxis;
+	vec3CrossProd(vecA, vecB, &vecAxis);
+	vec3Norm(&vecAxis);
+	mat3RotFromAxis(&vecAxis, matRot, theta);
 }
 
 void mat3AccAlign(struct vec3 * vecAcc, struct mat3 * matOri, float weight, float max)
@@ -322,27 +330,19 @@ void mat3OrthoFix(struct mat3 * mat)
 	float err = vec3DotProd(&vecOldX, &vecOldY);
 	struct vec3 vecX = vecOldY;
 	vec3Mult(&vecX, (-0.5) * err);
-	vec3Add(&vecOldX, &vecX, &vecX);
+	vec3Accum(&vecX, &vecOldX);
 	vec3Norm(&vecX);
 	mat3SetColumn(&vecX, mat, 0);
 	
 	struct vec3 vecY = vecOldX;
 	vec3Mult(&vecY, (-0.5) * err);
-	vec3Add(&vecOldY, &vecY, &vecY);
+	vec3Accum(&vecY, &vecOldY);
 	vec3Norm(&vecY);
 	mat3SetColumn(&vecY, mat, 1);
 	
 	struct vec3 vecZ;
 	vec3CrossProd(&vecX, &vecY, &vecZ);
 	mat3SetColumn(&vecZ, mat, 2);
-}
-
-void mat3RotFromVecPair(struct vec3 * vecA, struct vec3 * vecB, struct mat3 * matRot, float theta)
-{	
-	struct vec3 vecAxis;
-	vec3CrossProd(vecA, vecB, &vecAxis);
-	vec3Norm(&vecAxis);
-	mat3RotFromAxis(&vecAxis, matRot, theta);
 }
 
 

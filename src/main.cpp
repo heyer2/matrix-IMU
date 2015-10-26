@@ -432,7 +432,6 @@ void setup()
 	Serial.begin(SERIAL_BAUD);
 	Wire.begin();
 	delay(400);
-	Serial.printf("lol1");
 }
 
 void loop()
@@ -446,22 +445,15 @@ void loop()
 
 	static int flagFirstRun = 1;
 	if (flagFirstRun) {
-		Serial.printf("lol2");
 		gyrSetDefault(&gyr);
-		Serial.printf("lol3");
 		gyrApply(&gyr);
-		Serial.printf("lol4");
 		gyrGetBias(&gyr);
-		Serial.printf("lol5");
 		accSetDefault(&acc);
 		accApply(&acc);
-		Serial.printf("lol6");
 		magSetDefault(&mag);
 		magApply(&mag);
-		Serial.printf("lol7");
 		mat3Eyes(&matOri);
 		flagFirstRun = 0;
-		Serial.printf("lol8");
 	};
 	
 	update = 0;
