@@ -1,6 +1,12 @@
 #ifndef SENSORS_H
 #define SENSORS_H
 
+#include <matrix.h>
+
+#define MAG_ALIGN_MAX   0.01 // Max jump in radians
+#define MAG_ALIGN_SPEED 0.05 // Defines alignment speed
+#define ACC_ALIGN_MAX   0.01 // Max jump in radians
+#define ACC_ALIGN_SPEED 0.05 // Defines alignment speed
 
 enum gyrOutputRate {g_HZ_100, g_HZ_200, g_HZ_400, g_HZ_800};
 enum gyrBandWidth {BW_LOWEST, BW_LOW, BW_HIGH, BW_HIGHEST};

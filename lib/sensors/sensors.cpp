@@ -1,5 +1,5 @@
-#include <sensor.h>
-#include <stdint>
+#include <stdint.h>
+#include <sensors.h>
 #include <matrix.h>
 #include <i2c_t3.h> // If using Teensy 3.x
 //#include "Wire.h" // If using arduino
@@ -60,13 +60,11 @@
 
 #define ACC_SUB_OUT 0x28 // Initial register, use incrementing read
 
-#define ACC_LSB_2G  0.001
-#define ACC_LSB_4G  0.002
-#define ACC_LSB_8G  0.004
-#define ACC_LSB_16G 0.012
+#define ACC_LSB_2G  toForm(0.001)
+#define ACC_LSB_4G  toForm(0.002)
+#define ACC_LSB_8G  toForm(0.004)
+#define ACC_LSB_16G toForm(0.012)
 
-#define ACC_ALIGN_MAX   0.01 // Max jump in radians
-#define ACC_ALIGN_SPEED 0.05 // Defines alignment speed
 
 #define MAG_SAD 0x1E
 
@@ -97,31 +95,28 @@
 
 #define MAG_SUB_OUT 0x03
 
-#define MAG_LSB_1x3GAUSS_XY (1.0/1100)
-#define MAG_LSB_1x3GAUSS_Z  (1.0/980)
-#define MAG_LSB_1x9GAUSS_XY (1.0/855)
-#define MAG_LSB_1x9GAUSS_Z  toFormat(1.0/760))
-#define MAG_LSB_2x5GAUSS_XY (1.0/670)
-#define MAG_LSB_2x5GAUSS_Z  (1.0/600)
-#define MAG_LSB_4x0GAUSS_XY (1.0/450)
-#define MAG_LSB_4x0GAUSS_Z  (1.0/400)
-#define MAG_LSB_4x7GAUSS_XY (1.0/400)
-#define MAG_LSB_4x7GAUSS_Z  (1.0/355)
-#define MAG_LSB_5x6GAUSS_XY (1.0/330)
-#define MAG_LSB_5x6GAUSS_Z  (1.0/295)
-#define MAG_LSB_8x1GAUSS_XY (1.0/230)
-#define MAG_LSB_8x1GAUSS_Z  (1.0/205)
+#define MAG_LSB_1x3GAUSS_XY toForm(1.0/1100)
+#define MAG_LSB_1x3GAUSS_Z  toForm(1.0/980)
+#define MAG_LSB_1x9GAUSS_XY toForm(1.0/855)
+#define MAG_LSB_1x9GAUSS_Z  toForm(1.0/760)
+#define MAG_LSB_2x5GAUSS_XY toForm(1.0/670)
+#define MAG_LSB_2x5GAUSS_Z  toForm(1.0/600)
+#define MAG_LSB_4x0GAUSS_XY toForm(1.0/450)
+#define MAG_LSB_4x0GAUSS_Z  toForm(1.0/400)
+#define MAG_LSB_4x7GAUSS_XY toForm(1.0/400)
+#define MAG_LSB_4x7GAUSS_Z  toForm(1.0/355)
+#define MAG_LSB_5x6GAUSS_XY toForm(1.0/330)
+#define MAG_LSB_5x6GAUSS_Z  toForm(1.0/295)
+#define MAG_LSB_8x1GAUSS_XY toForm(1.0/230)
+#define MAG_LSB_8x1GAUSS_Z  toForm(1.0/205)
 
-#define MAG_BIAS_X (-4.17705880568963)
-#define MAG_BIAS_Y (-48.5696006492905)
-#define MAG_BIAS_Z (398.835722468053 )
+#define MAG_BIAS_X toForm(-4.1770588056896)
+#define MAG_BIAS_Y toForm(-48.569600649290)
+#define MAG_BIAS_Z toForm(398.835722468053)
 
-#define MAG_GAIN_X 0.00234202173981799
-#define MAG_GAIN_Y 0.00241234250943554
-#define MAG_GAIN_Z 0.00277519214826859
-
-#define MAG_ALIGN_MAX   0.01 // Max jump in radians
-#define MAG_ALIGN_SPEED 0.05 // Defines alignment speed
+#define MAG_GAIN_X toForm(0.00234202173981799)
+#define MAG_GAIN_Y toForm(0.00241234250943554)
+#define MAG_GAIN_Z toForm(0.00277519214826859)
 
 
 static void I2CWriteReg(char SAD, char SUB, char byte)
@@ -231,7 +226,7 @@ void gyrGetBias(struct gyro * gyr)
 		gyrUpdate(gyr);
 		vec3Accum(&vecTmp, &gyr->vecGyr);
 	}
-	vec3Mult(&vecTmp, -1.0f / GYR_BIAS_SAMPLES);
+	vec3Div(&vecTmp, -GYR_BIAS_SAMPLES);
 	gyr->vecBias = vecTmp;
 }
 
@@ -351,7 +346,7 @@ void magApply(struct magn * mag)
 
 void magGetAvailability(struct magn * mag)
 {	
-	unsigned int timeLim;
+	unsigned int timeLim = 0;
 	switch(mag->ODR) {
 		case m_HZ_0x75: timeLim = 2000; break; // Treated as 0.5Hz
 		case m_HZ_1x50: timeLim = 1000; break; // Treated as 1Hz
@@ -385,9 +380,10 @@ void magUpdate(struct magn * mag)
 	mag->vecMag.data[2] = (int16_t)(ZH << 8 | ZL);
 	
 	// These are preset, because only a sigle calibration was done
-	struct vecBias;
-	struct vecGain;
-	vec3Set(&vecBias, toFormat(-MAG_BIAS_X), -MAG_BIAS_Y, -MAG_BIAS_Z);
+	struct vec3 vecBias;
+	struct vec3 vecGain;
+	vec3Set(&vecBias, 0, 0 ,0);
+	//vec3Set(&vecBias, -MAG_BIAS_X, -MAG_BIAS_Y, -MAG_BIAS_Z);
 	vec3Set(&vecGain, MAG_GAIN_X, MAG_GAIN_Y, MAG_GAIN_Z);
 
 	vec3Accum(&mag->vecMag, &vecBias);

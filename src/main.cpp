@@ -1,11 +1,11 @@
 #include "Arduino.h"
 #include <matrix.h>
+#include <i2c_t3.h> // If using Teensy 3.x
+//#include "Wire.h" // If using arduino
+#include <sensors.h>
 
 
 #define SERIAL_BAUD 115200
-
-
-
 
 void setup()
 {

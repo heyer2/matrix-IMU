@@ -1,32 +1,34 @@
 #ifndef MATRIX_H
 #define MATRIX_H
 
+#include <fixmath.h>
+
 struct mat3 {
-	float data[3][3];
+	intFix data[3][3];
 };
 
 struct vec3 {
-	float data[3];
+	intFix data[3];
 };
 
-inline float toForm(float input) 
+inline intFix toForm(float input) 
 {
-	return input;
+	return float2Fix(input);
 }
 
 void vec3Send(struct vec3 * vec);
 void vec3Print(struct vec3 * vec);
 void vec3Zero(struct vec3 * vec);
-void vec3Set(struct vec3 * vec, float x, float y, float z);
-void vec3Div(struct vec3 * vec, float k);
-void vec3Mult(struct vec3 * vec, float k);
+void vec3Set(struct vec3 * vec, intFix x, intFix y, intFix z);
+void vec3Div(struct vec3 * vec, intFix k);
+void vec3Mult(struct vec3 * vec, intFix k);
 void vec3MultVec(struct vec3 * vec, struct vec3 * vecFac);
 void vec3Add(struct vec3 * vecA, struct vec3 * vecB, struct vec3 * vecOut);
 void vec3Accum(struct vec3 * vecAccum, struct vec3 * vecAdd);
-void vec3AccumMult(struct vec3 * vecAccum, struct vec3 * vecAdd, float k);
-float vec3DotProd(struct vec3 * vecA, struct vec3 * vecB);
+void vec3AccumMult(struct vec3 * vecAccum, struct vec3 * vecAdd, intFix k);
+intFix vec3DotProd(struct vec3 * vecA, struct vec3 * vecB);
 void vec3CrossProd(struct vec3 * vecA, struct vec3 * vecB, struct vec3 * vecCross);
-float vec3Length(struct vec3 * vec);
+intFix vec3Length(struct vec3 * vec);
 void vec3Norm(struct vec3 * vec);
 float vec3GetAng(struct vec3 * vecA, struct vec3 * vecB);
 void mat3Send(struct mat3 * mat);
@@ -39,8 +41,8 @@ void mat3Transpose(struct mat3 * matIn, struct mat3 * matOut);
 void mat3ExtractColumn(struct mat3 * mat, struct vec3 * vec, int col);
 void mat3ExtractRow(struct mat3 * mat, struct vec3 * vec, int row);
 void mat3SetColumn(struct vec3 * vec, struct mat3 * mat, int col);
-void mat3SetRowMan(int row, struct mat3 * mat, float a, float b, float c);
-float mat3Det(struct mat3 * mat);
+void mat3SetRowMan(int row, struct mat3 * mat, intFix a, intFix b, intFix c);
+intFix mat3Det(struct mat3 * mat);
 void mat3RotAxisX(struct mat3 * mat, float theta);
 void mat3RotAxisY(struct mat3 * mat, float theta);
 void mat3RotAxisZ(struct mat3 * mat, float theta);
