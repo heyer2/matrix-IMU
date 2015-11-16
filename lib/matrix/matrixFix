@@ -1,12 +1,50 @@
+#include <stdint>
 #include "arduino.h"
-#include <matrix.h>
+#include <matrixFix.h>
 
-inline float toFormat(float input) 
+#define MAX_INT_SIZE (1 << (8 * (sizeof(intFix) - 1)))
+
+#define intFix int32_t
+#define longFix int64_t
+
+static inline static intFix multFix(intFix a, intFix b);
 {
-	return input;
+	return ((longFix)a * b) >> sizeof(intFix);
+} 
+
+static inline static intFix divFix(intFix a, intFix b);
+{
+	return (((longFix)a << sizeof(intFix)) / b);
 }
 
-static inline float limit(float input, float min, float max)
+static inline static intFix sqrtFix(intfix a)
+{	
+	int res = 0;
+	// Can be optimized, because result can never equal max i. Also, consider early exit
+	for (int i = sizeof(intFix) / 2; i >= 0; i--) {
+		tmp = res + (1 << i);
+		if (a >= tmp * tmp)
+			res += 1 << i;
+	}
+	return res << sizeof(intFix) / 2;
+}
+
+static inline static intFix float2Fix(float f);
+{
+	return f * MAX_INT_SIZE;
+}
+
+static inline static intFix fix2Float(float i);
+{
+	return (float)i / MAX_INT_SIZE;
+}
+
+inline intFix toForm(float input) 
+{
+	return float2Fix(input);
+}
+
+static inline intFix limit(intFix input, intFix min, intFix max)
 {
 	if (input > max)
 		return max;
@@ -18,13 +56,13 @@ static inline float limit(float input, float min, float max)
 
 inline void vec3Send(struct vec3 * vec)
 {
-	Serial.write((const char*)&vec->data, 3 * sizeof(float));
+	Serial.write((const char*)&vec->data, 3 * sizeof(intFix));
 	Serial.write('\n');
 }
 
 inline void vec3Print(struct vec3 * vec)
 {
-	Serial.printf("% 8.6f % 8.6f % 8.6f", vec->data[0], vec->data[1], vec->data[2]);
+	Serial.printf("%i %i %i", vec->data[0], vec->data[1], vec->data[2]);
 }
 
 inline void vec3Zero(struct vec3 * vec)
@@ -34,32 +72,25 @@ inline void vec3Zero(struct vec3 * vec)
 	vec->data[2] = 0;
 }
 
-inline void vec3Set(struct vec3 * vec, float x, float y, float z)
+inline void vec3Set(struct vec3 * vec, intFix x, intFix y, intFix z)
 {
 	vec->data[0] = x;
 	vec->data[1] = y;
 	vec->data[2] = z;	
 }
-
-inline void vec3Div(struct vec3 * vec, float k)
+¨s
+inline void vec3Mult(struct vec3 * vec, intFix k)
 {
-	vec->data[0] /= k;
-	vec->data[1] /= k;
-	vec->data[2] /= k;
-}
-
-inline void vec3Mult(struct vec3 * vec, float k)
-{
-	vec->data[0] *= k;
-	vec->data[1] *= k;
-	vec->data[2] *= k;
+	vec->data[0] = multFix(vec->data[0], k);
+	vec->data[1] = multFix(vec->data[1], k);
+	vec->data[2] = multFix(vec->data[2], k);
 }
 
 inline void vec3MultVec(struct vec3 * vec struct vec3 * vecFac)
 {
-	vec->data[0] *= vecFac->data[0];
-	vec->data[1] *= vecFac->data[1];
-	vec->data[2] *= vecFac->data[2];
+	vec->data[0] = multFix(vec->data[0], vecFac->data[0]);
+	vec->data[1] = multFix(vec->data[1], vecFac->data[1]);
+	vec->data[2] = multFix(vec->data[2], vecFac->data[2]);
 }
 
 inline void vec3Add(struct vec3 * vecA, struct vec3 * vecB, struct vec3 * vecOut)
@@ -76,28 +107,28 @@ inline void vec3Accum(struct vec3 * vecAccum, struct vec3 * vecAdd)
 	vecAccum->data[2] += vecAdd->data[2];
 }
 
-inline void vec3AccumMult(struct vec3 * vecAccum, struct vec3 * vecAdd, float k)
+inline void vec3AccumMult(struct vec3 * vecAccum, struct vec3 * vecAdd, intFix k)
 {
-	vecAccum->data[0] += vecAdd->data[0] * k;
-	vecAccum->data[1] += vecAdd->data[1] * k;
-	vecAccum->data[2] += vecAdd->data[2] * k;
+	vecAccum->data[0] += multFix(vecAdd->data[0], k);
+	vecAccum->data[1] += multFix(vecAdd->data[1], k);
+	vecAccum->data[2] += multFix(vecAdd->data[2], k);
 }
 
-inline float vec3DotProd(struct vec3 * vecA, struct vec3 * vecB)
+inline intFix vec3DotProd(struct vec3 * vecA, struct vec3 * vecB)
 {
-	return vecA->data[0] * vecB->data[0] + vecA->data[1] * vecB->data[1] + vecA->data[2] * vecB->data[2];
+	return multFix(vecA->data[0], vecB->data[0]) + multFix(vecA->data[1], vecB->data[1]) + multFix(vecA->data[2] * vecB->data[2]);
 }
 
 inline void vec3CrossProd(struct vec3 * vecA, struct vec3 * vecB, struct vec3 * vecCross)
 {
-	vecCross->data[0] = vecA->data[1] * vecB->data[2] - vecA->data[2] * vecB->data[1];
-	vecCross->data[1] = vecA->data[2] * vecB->data[0] - vecA->data[0] * vecB->data[2];
-	vecCross->data[2] = vecA->data[0] * vecB->data[1] - vecA->data[1] * vecB->data[0];
+	vecCross->data[0] = multFix(vecA->data[1], vecB->data[2]) - multFix(vecA->data[2], vecB->data[1]);
+	vecCross->data[1] = multFix(vecA->data[2], vecB->data[0]) - multFix(vecA->data[0], vecB->data[2]);
+	vecCross->data[2] = multFix(vecA->data[0], vecB->data[1]) - multFix(vecA->data[1], vecB->data[0]);
 }
 
-inline float vec3Length(struct vec3 * vec)
+inline intFix vec3Length(struct vec3 * vec)
 {
-	return sqrt(vec3DotProd(vec, vec));
+	return sqrtFix(vec3DotProd(vec, vec));
 }
 
 inline void vec3Norm(struct vec3 * vec)
@@ -106,19 +137,20 @@ inline void vec3Norm(struct vec3 * vec)
 }
 
 inline float vec3GetAng(struct vec3 * vecA, struct vec3 * vecB)
-{
-	return acos(limit(vec3DotProd(vecA, vecB), 0, 1));
+{	
+	intFix tmp = limit(vec3DotProd(vecA, vecB), 0, 1);
+	return acos(fix2Float(tmp));
 }
 
 inline void mat3Send(struct mat3 * mat)
 {
-	Serial.write((const char*)&mat->data, 9 * sizeof(float));
+	Serial.write((const char*)&mat->data, 9 * sizeof(intFix));
 	Serial.write('\n');
 }
 
 inline void mat3Print(struct mat3 * mat)
 {
-	Serial.printf("%4.3f %4.3f %4.3f %4.3f %4.3f %4.3f %4.3f %4.3f %4.3f",
+	Serial.printf("%i %i %i %i %i %i %i %i %i",
 	    mat->data[0][0], mat->data[0][1], mat->data[0][2],
         mat->data[1][0], mat->data[1][1], mat->data[1][2],
 		mat->data[2][0], mat->data[2][1], mat->data[2][2]);
@@ -127,15 +159,15 @@ inline void mat3Print(struct mat3 * mat)
 inline void mat3Zero(struct mat3 * mat)
 {
 	for (int i = 0; i < 9; i++)
-		((float*)mat->data)[i] = 0;
+		((intFix*)mat->data)[i] = 0;
 }
 
 inline void mat3Eye(struct mat3 * mat)
 {
 	mat3Zero(mat);
-	mat->data[0][0] = 1;
-	mat->data[1][1] = 1;
-	mat->data[2][2] = 1;
+	mat->data[0][0] = FIX_UNITY;
+	mat->data[1][1] = FIX_UNITY;
+	mat->data[2][2] = FIX_UNITY;
 }
 
 inline void mat3Mult(struct mat3 * matA, struct mat3 * matB, struct mat3 * matOut)
@@ -146,7 +178,7 @@ inline void mat3Mult(struct mat3 * matA, struct mat3 * matB, struct mat3 * matOu
 	for (int i = 0; i < 3; i++)
 		for (int j = 0; j < 3; j++)
 			for (int k = 0; k < 3; k++)
-				matTmp.data[i][j] += matA->data[i][k] * matB->data[k][j];
+				matTmp.data[i][j] += fixMult(matA->data[i][k], matB->data[k][j]);
 	*matOut = matTmp;
 }
 
@@ -156,7 +188,7 @@ inline void mat3MultVec(struct mat3 * mat, struct vec3 * vecIn, struct vec3 * ve
 	vec3Zero(&vecTmp);
 	for (int i = 0; i < 3; i++)
 		for (int j = 0; j < 3; j++)
-			vecTmp.data[i] += mat->data[i][j] * vecIn->data[j];
+			vecTmp.data[i] += multFix(mat->data[i][j], vecIn->data[j]);
 	*vecOut = vecTmp;
 }
 
@@ -190,23 +222,23 @@ inline void mat3SetColumn(struct vec3 * vec, struct mat3 * mat, int col)
 	mat->data[2][col] = vec->data[2];
 }
 
-inline void mat3SetRowMan(int row, struct mat3 * mat, float a, float b, float c)
+inline void mat3SetRowMan(int row, struct mat3 * mat, intFix a, intFix b, intFix c)
 {
 	mat->data[row][0] = a;
 	mat->data[row][1] = b;
 	mat->data[row][2] = c;
 }
 
-inline float mat3Det(struct mat3 * mat)
+inline intFix mat3Det(struct mat3 * mat)
 {
-	float result = 0;
+	intFix result = 0;
 
-	result += mat->data[0][0] * mat->data[1][1] * mat->data[2][2];
-	result += mat->data[0][1] * mat->data[1][2] * mat->data[2][0];
-	result += mat->data[0][2] * mat->data[1][0] * mat->data[2][1];
-	result -= mat->data[0][1] * mat->data[1][0] * mat->data[2][2];
-	result -= mat->data[0][0] * mat->data[1][2] * mat->data[2][1];
-	result -= mat->data[0][2] * mat->data[1][1] * mat->data[2][0];	
+	result += multFix(multFix(mat->data[0][0], mat->data[1][1]), mat->data[2][2]);
+	result += multFix(multFix(mat->data[0][1], mat->data[1][2]), mat->data[2][0]);
+	result += multFix(multFix(mat->data[0][2], mat->data[1][0]), mat->data[2][1]);
+	result -= multFix(multFix(mat->data[0][1], mat->data[1][0]), mat->data[2][2]);
+	result -= multFix(multFix(mat->data[0][0], mat->data[1][2]), mat->data[2][1]);
+	result -= multFix(multFix(mat->data[0][2], mat->data[1][1]), mat->data[2][0]);	
 
 	return result;
 }
@@ -220,8 +252,8 @@ inline void mat3RotAxisX(struct mat3 * mat, float theta)
 
 	struct vec3 vecTmp;
 
-	float cosTheta = 1 - theta * theta * 0.5;
-	float sinTheta = theta;
+	intFix cosTheta = FIX_UNITY - float2Fix(theta * theta * 0.5);
+	intFix sinTheta = float2Fix(theta);
 
 	vec3Zero(&vecTmp);
 	vec3AccumMult(&vecTmp, &vecY, cosTheta);
@@ -243,8 +275,8 @@ inline void mat3RotAxisY(struct mat3 * mat, float theta)
 
 	struct vec3 vecTmp;
 
-	float cosTheta = 1 - theta * theta * 0.5;
-	float sinTheta = theta;
+	intFix cosTheta = FIX_UNITY - float2Fix(theta * theta * 0.5);
+	intFix sinTheta = float2Fix(theta);
 
 	vec3Zero(&vecTmp);
 	vec3AccumMult(&vecTmp, &vecX,  cosTheta);
@@ -266,8 +298,8 @@ inline void mat3RotAxisZ(struct mat3 * mat, float theta)
 
 	struct vec3 vecTmp;
 
-	float cosTheta = 1 - theta * theta * 0.5;
-	float sinTheta = theta;
+	intFix cosTheta = FIX_UNITY - float2Fix(theta * theta * 0.5);
+	intFix sinTheta = float2Fix(theta);
 
 	vec3Zero(&vecTmp);
 	vec3AccumMult(&vecTmp, &vecX, cosTheta);
@@ -289,9 +321,9 @@ inline void mat3GyrRot(struct vec3 * vecVel, struct mat3 * matOri, float timeEla
 
 inline void mat3RotFromAxis(struct vec3 * vecAxis, struct mat3 * matRot, float theta)
 {	
-	float cosTheta = cos(theta);
-	float sinTheta = sin(theta);
-	float oneMinusCos = 1 - cosTheta;
+	intFix cosTheta = float2Fix(cos(theta));
+	intFix sinTheta = float2Fix(sin(theta));
+	intFix oneMinusCos = 1 - cosTheta;
 	
 	matRot->data[0][0] = cosTheta + vecAxis->data[0] * vecAxis->data[0] * oneMinusCos;
 	matRot->data[0][1] = vecAxis->data[0] * vecAxis->data[1] * oneMinusCos - vecAxis->data[2] * sinTheta;
@@ -330,8 +362,8 @@ inline void mat3AccAlign(struct vec3 * vecAcc, struct mat3 * matOri, float weigh
 
 inline void mat3RotZ(struct mat3 * matRot, float theta)
 {
-	mat3SetRowMan(0, matRot, cos(theta), -sin(theta), 0);
-	mat3SetRowMan(1, matRot, sin(theta),  cos(theta), 0);
+	mat3SetRowMan(0, matRot, float2Fix(cos(theta)), float2Fix(-sin(theta)), 0);
+	mat3SetRowMan(1, matRot, float2Fix(sin(theta)), float2Fix( cos(theta)), 0);
 	mat3SetRowMan(2, matRot, 0, 0, 1);
 }
 
@@ -356,7 +388,7 @@ inline void mat3OrthoFix(struct mat3 * mat)
 	mat3ExtractColumn(mat, &vecOldX, 0);
 	mat3ExtractColumn(mat, &vecOldY, 1);
 	
-	float err = vec3DotProd(&vecOldX, &vecOldY);
+	intFix err = vec3DotProd(&vecOldX, &vecOldY);
 	struct vec3 vecX = vecOldY;
 	vec3Mult(&vecX, (-0.5) * err);
 	vec3Accum(&vecX, &vecOldX);
