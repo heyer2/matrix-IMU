@@ -1,9 +1,9 @@
 #include "Arduino.h"
 #include <matrix.h>
+#include <matrixFix.h>
 #include <i2c_t3.h> // If using Teensy 3.x
 //#include "Wire.h" // If using arduino
 #include <sensors.h>
-
 
 #define SERIAL_BAUD 115200
 
@@ -15,12 +15,22 @@ void setup()
 	Wire.setRate(I2C_RATE_400);
 }
 
+static unsigned int timeSince(unsigned int timer)
+{
+	return micros() - timer;
+}
+
 void loop()
-{	
+{
 	static struct gyro gyr;
 	static struct acce acc;
 	static struct magn mag;
-	static struct mat3 matOri;
+	static struct mat3f matOri;
+
+	static unsigned int timerSend = 0;
+	static unsigned int timerCalc = 0;
+	static unsigned int intervalSend;
+	static unsigned int intervalCalc;
 
 	static int flagFirstRun = 1;
 	if (flagFirstRun) {
@@ -31,37 +41,50 @@ void loop()
 		accApply(&acc);
 		magSetDefault(&mag);
 		magApply(&mag);
-		mat3Eye(&matOri);
+		mat3fEye(&matOri);
 		flagFirstRun = 0;
 	};
 	
-	int update = 1;
-
+	int update = 0;
+	
+	/*
 	gyrGetAvailability(&gyr);
 	if (gyr.flagNewAvail) {
 		gyrUpdate(&gyr);
-		//mat3GyrRot(&gyr.vecGyr, &matOri, gyrTimeSinceUse(&gyr, 1));
+		mat3fGyrRot(&gyr.vecAng, &matOri);
 		update = 1;
 	}
-	
+	*/
 	
 	accGetAvailability(&acc);
 	if (acc.flagNewAvail) {
   		accUpdate(&acc);
-  		mat3AccAlign(&acc.vecAcc, &matOri, ACC_ALIGN_SPEED, ACC_ALIGN_MAX);
+  		mat3fAccAlign(&acc.vecAcc, &matOri, ACC_ALIGN_SPEED, ACC_ALIGN_MAX);
   		update = 1;
   	}
-
+	
+  	/*
   	magGetAvailability(&mag);
 	if (mag.flagNewAvail) {
   		magUpdate(&mag);
   		mat3MagAlign(&mag.vecMag, &matOri, MAG_ALIGN_SPEED, MAG_ALIGN_MAX);
   		update = 1;
   	}
- 	
+ 	*/
+
   	if (update) {
-  		mat3SetColumn(&gyr.vecGyr, &matOri, 1);
-  		mat3Send(&matOri);
+  		intervalCalc = timeSince(timerCalc);
+  		timerCalc += intervalCalc;
+  	}
+
+  	if (timeSince(timerSend) > 10000) {
+  		intervalSend = timeSince(timerSend);
+  		timerSend += intervalSend;
+  		Serial.printf("C: %d S: %d  ", intervalCalc, intervalSend);
+  		
+  		//mat3fSend(&matOri);
+  		//vec3fPrint(&gyr.vecBias);
+  		//Serial.printf("\n\r");
  	 	Serial.send_now();
   	}
 }

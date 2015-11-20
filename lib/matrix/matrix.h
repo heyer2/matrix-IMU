@@ -9,11 +9,6 @@ struct vec3 {
 	float data[3];
 };
 
-inline float toForm(float input) 
-{
-	return input;
-}
-
 void vec3Send(struct vec3 * vec);
 void vec3Print(struct vec3 * vec);
 void vec3Zero(struct vec3 * vec);
@@ -28,7 +23,7 @@ float vec3DotProd(struct vec3 * vecA, struct vec3 * vecB);
 void vec3CrossProd(struct vec3 * vecA, struct vec3 * vecB, struct vec3 * vecCross);
 float vec3Length(struct vec3 * vec);
 void vec3Norm(struct vec3 * vec);
-float vec3GetAng(struct vec3 * vecA, struct vec3 * vecB);
+float vec3Ang(struct vec3 * vecA, struct vec3 * vecB);
 void mat3Send(struct mat3 * mat);
 void mat3Print(struct mat3 * mat);
 void mat3Zero(struct mat3 * mat);

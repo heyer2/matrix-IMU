@@ -101,7 +101,7 @@ void vec3Norm(struct vec3 * vec)
 	vec3Div(vec, vec3Length(vec));
 }
 
-float vec3GetAng(struct vec3 * vecA, struct vec3 * vecB)
+float vec3Ang(struct vec3 * vecA, struct vec3 * vecB)
 {
 	return acos(limit(vec3DotProd(vecA, vecB), 0, 1));
 }
@@ -316,7 +316,7 @@ void mat3AccAlign(struct vec3 * vecAcc, struct mat3 * matOri, float weight, floa
 		vecTmp = *vecAcc;
 		vec3Norm(&vecTmp); //Removing this would make the angle slightly wrong, since A.B  = cos(theta)*||A|B|
 
-		float theta = vec3GetAng(&vecZ, &vecTmp);
+		float theta = vec3Ang(&vecZ, &vecTmp);
 		theta = limit(theta * weight, -max, max); // Albeit theta can only be positive
 
 		struct mat3 matRotAlign;

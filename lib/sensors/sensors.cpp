@@ -1,8 +1,12 @@
 #include <stdint.h>
 #include <sensors.h>
 #include <matrix.h>
+#include <matrixFix.h>
 #include <i2c_t3.h> // If using Teensy 3.x
 //#include "Wire.h" // If using arduino
+
+#include "Arduino.h"
+
 
 #define MILLIS2SEC 0.001;
 
@@ -60,10 +64,10 @@
 
 #define ACC_SUB_OUT 0x28 // Initial register, use incrementing read
 
-#define ACC_LSB_2G  toForm(0.001)
-#define ACC_LSB_4G  toForm(0.002)
-#define ACC_LSB_8G  toForm(0.004)
-#define ACC_LSB_16G toForm(0.012)
+#define ACC_LSB_2G  0.001
+#define ACC_LSB_4G  0.002
+#define ACC_LSB_8G  0.004
+#define ACC_LSB_16G 0.012
 
 
 #define MAG_SAD 0x1E
@@ -95,28 +99,28 @@
 
 #define MAG_SUB_OUT 0x03
 
-#define MAG_LSB_1x3GAUSS_XY toForm(1.0/1100)
-#define MAG_LSB_1x3GAUSS_Z  toForm(1.0/980)
-#define MAG_LSB_1x9GAUSS_XY toForm(1.0/855)
-#define MAG_LSB_1x9GAUSS_Z  toForm(1.0/760)
-#define MAG_LSB_2x5GAUSS_XY toForm(1.0/670)
-#define MAG_LSB_2x5GAUSS_Z  toForm(1.0/600)
-#define MAG_LSB_4x0GAUSS_XY toForm(1.0/450)
-#define MAG_LSB_4x0GAUSS_Z  toForm(1.0/400)
-#define MAG_LSB_4x7GAUSS_XY toForm(1.0/400)
-#define MAG_LSB_4x7GAUSS_Z  toForm(1.0/355)
-#define MAG_LSB_5x6GAUSS_XY toForm(1.0/330)
-#define MAG_LSB_5x6GAUSS_Z  toForm(1.0/295)
-#define MAG_LSB_8x1GAUSS_XY toForm(1.0/230)
-#define MAG_LSB_8x1GAUSS_Z  toForm(1.0/205)
+#define MAG_LSB_1x3GAUSS_XY (1.0/1100)
+#define MAG_LSB_1x3GAUSS_Z  (1.0/980)
+#define MAG_LSB_1x9GAUSS_XY (1.0/855)
+#define MAG_LSB_1x9GAUSS_Z  (1.0/760)
+#define MAG_LSB_2x5GAUSS_XY (1.0/670)
+#define MAG_LSB_2x5GAUSS_Z  (1.0/600)
+#define MAG_LSB_4x0GAUSS_XY (1.0/450)
+#define MAG_LSB_4x0GAUSS_Z  (1.0/400)
+#define MAG_LSB_4x7GAUSS_XY (1.0/400)
+#define MAG_LSB_4x7GAUSS_Z  (1.0/355)
+#define MAG_LSB_5x6GAUSS_XY (1.0/330)
+#define MAG_LSB_5x6GAUSS_Z  (1.0/295)
+#define MAG_LSB_8x1GAUSS_XY (1.0/230)
+#define MAG_LSB_8x1GAUSS_Z  (1.0/205)
 
-#define MAG_BIAS_X toForm(-4.1770588056896)
-#define MAG_BIAS_Y toForm(-48.569600649290)
-#define MAG_BIAS_Z toForm(398.835722468053)
+#define MAG_BIAS_X (-4.1770588056896)
+#define MAG_BIAS_Y (-48.569600649290)
+#define MAG_BIAS_Z (398.835722468053)
 
-#define MAG_GAIN_X toForm(0.00234202173981799)
-#define MAG_GAIN_Y toForm(0.00241234250943554)
-#define MAG_GAIN_Z toForm(0.00277519214826859)
+#define MAG_GAIN_X (0.00234202173981799)
+#define MAG_GAIN_Y (0.00241234250943554)
+#define MAG_GAIN_Z (0.00277519214826859)
 
 
 static void I2CWriteReg(char SAD, char SUB, char byte)
@@ -150,8 +154,8 @@ void gyrSetDefault(struct gyro * gyr)
 	gyr->BW  = BW_HIGHEST;
 	gyr->FS  = DPS_2000;
 
-	vec3Zero(&gyr->vecBias);
-	vec3Zero(&gyr->vecGyr);
+	vec3fZero(&gyr->vecBias);
+	vec3fZero(&gyr->vecGyr);
 	gyr->timeUsed = 0;
 	gyr->flagNewAvail = 0;
 }
@@ -199,51 +203,61 @@ void gyrUpdate(struct gyro * gyr)
 	unsigned int ZL = Wire.read();
 	unsigned int ZH = Wire.read();	
 	
+	
 	gyr->vecGyr.data[0] = (int16_t)(XH << 8 | XL);
 	gyr->vecGyr.data[1] = (int16_t)(YH << 8 | YL);
 	gyr->vecGyr.data[2] = (int16_t)(ZH << 8 | ZL);
 	
+
+	unsigned int microsElapsed = micros() - gyr->timeUsed;
+	gyr->timeUsed += microsElapsed;
+
+	vec3fAccum(&gyr->vecGyr, &gyr->vecBias);
+
+	// MAX ANGLE IS SUPPOSED TO BE PI not 2PI change this!#!#!#!#!#!#!#
 	switch(gyr->FS) {
-		case DPS_245 : vec3Mult(&gyr->vecGyr, GYR_LSB_245DPS) ; break;
-		case DPS_500 : vec3Mult(&gyr->vecGyr, GYR_LSB_500DPS) ; break;
-		case DPS_2000: vec3Mult(&gyr->vecGyr, GYR_LSB_2000DPS); break;
+		case DPS_245: 
+			gyr->vecAng.data[0] = (((int64_t)gyr->vecGyr.data[0] << 47) / 360 * 35 / 4000 * microsElapsed / 1000000) >> 16;
+			gyr->vecAng.data[1] = (((int64_t)gyr->vecGyr.data[1] << 47) / 360 * 35 / 4000 * microsElapsed / 1000000) >> 16;
+			gyr->vecAng.data[2] = (((int64_t)gyr->vecGyr.data[2] << 47) / 360 * 35 / 4000 * microsElapsed / 1000000) >> 16;
+			break;
+		case DPS_500: 
+			gyr->vecAng.data[0] = (((int64_t)gyr->vecGyr.data[0] << 47) / 360 * 35 / 2000 * microsElapsed / 1000000) >> 16;
+			gyr->vecAng.data[1] = (((int64_t)gyr->vecGyr.data[1] << 47) / 360 * 35 / 2000 * microsElapsed / 1000000) >> 16;
+			gyr->vecAng.data[2] = (((int64_t)gyr->vecGyr.data[2] << 47) / 360 * 35 / 2000 * microsElapsed / 1000000) >> 16;
+			break;
+		case DPS_2000: 
+			gyr->vecAng.data[0] = (((int64_t)gyr->vecGyr.data[0] << 47) / 360 * 35 /  500 * microsElapsed / 1000000) >> 16;
+			gyr->vecAng.data[1] = (((int64_t)gyr->vecGyr.data[1] << 47) / 360 * 35 /  500 * microsElapsed / 1000000) >> 16;
+			gyr->vecAng.data[2] = (((int64_t)gyr->vecGyr.data[2] << 47) / 360 * 35 /  500 * microsElapsed / 1000000) >> 16;
+		break;
 	}
-
-	vec3Accum(&gyr->vecGyr, &gyr->vecBias);
-
 	gyr->flagNewAvail = 0;
 }
 
 void gyrGetBias(struct gyro * gyr)
 {	
-	struct vec3 vecTmp;
-	vec3Zero(&vecTmp);
-	vec3Zero(&gyr->vecBias);
+	struct vec3f vecTmp;
+	vec3fZero(&vecTmp);
+	vec3fZero(&gyr->vecBias);
 	
 	for (int i = 0; i < GYR_BIAS_SAMPLES; i++) {
 		while(!gyr->flagNewAvail)
 			gyrGetAvailability(gyr);
 		gyrUpdate(gyr);
-		vec3Accum(&vecTmp, &gyr->vecGyr);
+		vec3fAccum(&vecTmp, &gyr->vecGyr);
 	}
-	vec3Div(&vecTmp, -GYR_BIAS_SAMPLES);
-	gyr->vecBias = vecTmp;
-}
-
-float gyrTimeSinceUse(struct gyro * gyr, int update)
-{	
-	int millisElapsed = millis() - gyr->timeUsed;
-	if (update)
-		gyr->timeUsed += millisElapsed;
-	return millisElapsed * MILLIS2SEC;
+	gyr->vecBias.data[0] = -vecTmp.data[0] / GYR_BIAS_SAMPLES;
+	gyr->vecBias.data[1] = -vecTmp.data[1] / GYR_BIAS_SAMPLES;
+	gyr->vecBias.data[2] = -vecTmp.data[2] / GYR_BIAS_SAMPLES;
 }
 
 void accSetDefault(struct acce * acc) 
 {
-	acc->ODR = a_HZ_100; //25
+	acc->ODR = a_HZ_25; //25
 	acc->FS  = G_2;
 
-	vec3Zero(&acc->vecAcc);
+	vec3fZero(&acc->vecAcc);
 	acc->flagNewAvail = 0;
 }
 
@@ -293,12 +307,18 @@ void accUpdate(struct acce * acc)
 	acc->vecAcc.data[1] = (int16_t)(YH << 8 | YL) >> 4; // Also, right shift of signed int is implementation defined
 	acc->vecAcc.data[2] = (int16_t)(ZH << 8 | ZL) >> 4;
 	
+	acc->vecAcc.data[0] <<= 16;
+	acc->vecAcc.data[1] <<= 16;
+	acc->vecAcc.data[2] <<= 16;
+
+	/* DEBUG
 	switch(acc->FS) {
-		case G_2 : vec3Mult(&acc->vecAcc, ACC_LSB_2G) ; break;
-		case G_4 : vec3Mult(&acc->vecAcc, ACC_LSB_4G) ; break;
-		case G_8 : vec3Mult(&acc->vecAcc, ACC_LSB_8G) ; break;
-		case G_16: vec3Mult(&acc->vecAcc, ACC_LSB_16G); break;
+		case G_2 : vec3fMult(&acc->vecAcc, ACC_LSB_2G) ; break;
+		case G_4 : vec3fMult(&acc->vecAcc, ACC_LSB_4G) ; break;
+		case G_8 : vec3fMult(&acc->vecAcc, ACC_LSB_8G) ; break;
+		case G_16: vec3fMult(&acc->vecAcc, ACC_LSB_16G); break;
 	}
+	*/
 	acc->flagNewAvail = 0;
 }
 
@@ -307,7 +327,7 @@ void magSetDefault(struct magn * mag)
 	mag->ODR = m_HZ_30;
 	mag->FS  = GAUSS_1x3;
 
-	vec3Zero(&mag->vecMag);
+	vec3fZero(&mag->vecMag);
 	mag->timeUsed = 0;
 	mag->flagNewAvail = 0;
 }
@@ -380,14 +400,15 @@ void magUpdate(struct magn * mag)
 	mag->vecMag.data[2] = (int16_t)(ZH << 8 | ZL);
 	
 	// These are preset, because only a sigle calibration was done
-	struct vec3 vecBias;
-	struct vec3 vecGain;
-	vec3Set(&vecBias, 0, 0 ,0);
-	//vec3Set(&vecBias, -MAG_BIAS_X, -MAG_BIAS_Y, -MAG_BIAS_Z);
-	vec3Set(&vecGain, MAG_GAIN_X, MAG_GAIN_Y, MAG_GAIN_Z);
+	/* DEBUG
+	struct vec3f vecBias;
+	struct vec3f vecGain;
+	vec3fSet(&vecBias, 0, 0 ,0);
+	vec3fSet(&vecBias, -MAG_BIAS_X, -MAG_BIAS_Y, -MAG_BIAS_Z);
+	vec3fSet(&vecGain, MAG_GAIN_X, MAG_GAIN_Y, MAG_GAIN_Z);
 
-	vec3Accum(&mag->vecMag, &vecBias);
-	vec3MultVec(&mag->vecMag, &vecGain);
-
+	vec3fAccum(&mag->vecMag, &vecBias);
+	vec3fMultVec(&mag->vecMag, &vecGain);
+	*/
 	mag->flagNewAvail = 0;
 }
