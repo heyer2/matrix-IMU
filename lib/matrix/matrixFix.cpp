@@ -92,7 +92,8 @@ void vec3fCrossProd(struct vec3f * vecA, struct vec3f * vecB, struct vec3f * vec
 }
 
 intFix vec3fLength(struct vec3f * vec)
-{
+{	
+	// Serial.printf("dot: %f length: %f ",fix2Float(vec3fDotProd(vec, vec)),fix2Float(fixSqrt(vec3fDotProd(vec, vec))));
 	return fixSqrt(vec3fDotProd(vec, vec));
 }
 
@@ -103,8 +104,8 @@ void vec3fNorm(struct vec3f * vec)
 
 intFix vec3fAng(struct vec3f * vecA, struct vec3f * vecB)
 {	
-	intFix tmp = limit(vec3fDotProd(vecA, vecB), 0, 1);
-	return acos(fix2Float(tmp));
+	intFix tmp = vec3fDotProd(vecA, vecB);
+	return fixAcos(tmp);
 }
 
 void mat3fSend(struct mat3f * mat)
@@ -198,12 +199,12 @@ intFix mat3fDet(struct mat3f * mat)
 {
 	intFix result = 0;
 
-	result += fixMult(fixMult(mat->data[0][0], mat->data[1][1]), mat->data[2][2]);
-	result += fixMult(fixMult(mat->data[0][1], mat->data[1][2]), mat->data[2][0]);
-	result += fixMult(fixMult(mat->data[0][2], mat->data[1][0]), mat->data[2][1]);
-	result -= fixMult(fixMult(mat->data[0][1], mat->data[1][0]), mat->data[2][2]);
-	result -= fixMult(fixMult(mat->data[0][0], mat->data[1][2]), mat->data[2][1]);
-	result -= fixMult(fixMult(mat->data[0][2], mat->data[1][1]), mat->data[2][0]);	
+	result += fixMult3(mat->data[0][0], mat->data[1][1], mat->data[2][2]);
+	result += fixMult3(mat->data[0][1], mat->data[1][2], mat->data[2][0]);
+	result += fixMult3(mat->data[0][2], mat->data[1][0], mat->data[2][1]);
+	result -= fixMult3(mat->data[0][1], mat->data[1][0], mat->data[2][2]);
+	result -= fixMult3(mat->data[0][0], mat->data[1][2], mat->data[2][1]);
+	result -= fixMult3(mat->data[0][2], mat->data[1][1], mat->data[2][0]);	
 
 	return result;
 }
@@ -243,7 +244,8 @@ void mat3fRotFromAxis(struct vec3f * vecAxis, struct mat3f * matRot, intFix thet
 	intFix cosTheta = fixCos(theta);
 	intFix sinTheta = fixSin(theta);
 	intFix oneMinusCos = FIX_UNITY - cosTheta;
-	
+
+	//Serial.printf(" cos: %f sin: %f oneMinus: %f ", fix2Float(cosTheta), fix2Float(sinTheta),fix2Float(oneMinusCos));
 	matRot->data[0][0] = cosTheta + fixMult3(vecAxis->data[0], vecAxis->data[0], oneMinusCos);
 	matRot->data[0][1] = fixMult3(vecAxis->data[0], vecAxis->data[1], oneMinusCos) - fixMult(vecAxis->data[2], sinTheta);
 	matRot->data[0][2] = fixMult3(vecAxis->data[0], vecAxis->data[2], oneMinusCos) + fixMult(vecAxis->data[1], sinTheta);
@@ -259,7 +261,12 @@ void mat3fRotFromVecPair(struct vec3f * vecA, struct vec3f * vecB, struct mat3f 
 {
 	struct vec3f vecAxis;
 	vec3fCrossProd(vecA, vecB, &vecAxis);
+	// Serial.printf(" vCBef: "); 
+	// vec3fPrint(&vecAxis);
+	// Serial.printf("(x)");
 	vec3fNorm(&vecAxis);
+	// Serial.printf(" vCAft: "); 
+	// vec3fPrint(&vecAxis);
 	mat3fRotFromAxis(&vecAxis, matRot, theta);
 }
 
@@ -269,27 +276,20 @@ void mat3fAccAlign(struct vec3f * vecAcc, struct mat3f * matOri, intFix weight, 
 		struct vec3f vecTmp;
 		mat3fExtractRow(matOri, &vecZ, 2);
 		vecTmp = *vecAcc;
-
-
-
-
-		intFix dot = vec3fDotProd(&vecTmp, &vecTmp);
-		Serial.printf(" dot: %i ", dot);
-		intFix sqrtres = fixSqrt(dot);
-		Serial.printf(" sqrt: %i sqtest: %i test2: %i", sqrtres, fixSqrt(64),fixSqrt(1024));
-
-		//vec3fNorm(&vecTmp); //Removing this would make the angle slightly wrong, since A.B  = cos(theta)*||A|B|
-
+		// Serial.printf("(tmp)");
+		vec3fNorm(&vecTmp); //Removing this would make the angle slightly wrong, since A.B  = cos(theta)*||A|B|
+		//intFix dot = vec3fDotProd(&vecTmp, &vecTmp);
 		intFix theta = vec3fAng(&vecZ, &vecTmp);
 		//theta = limit(fixMult(theta, weight), -max, max); // Albeit theta can only be positive
 
 		struct mat3f matRotAlign;
 		mat3fRotFromVecPair(&vecZ, &vecTmp, &matRotAlign, -theta); // Negation can be removed by switching inputs to crossproduct
 		mat3fMult(matOri, &matRotAlign, matOri);
-		Serial.printf("\n\r Raw: %i, %i, %i", vecAcc->data[0], vecAcc->data[1], vecAcc->data[2]);
-		Serial.printf(" ang: %f Normal: ", fix2Float(theta));
-		vec3fPrint(&vecTmp);
-		Serial.printf("\n\r");
+		//Serial.printf("DOri: %f DRot: %f t: %f", fix2Float(mat3fDet(matOri)), fix2Float(mat3fDet(&matRotAlign)),fix2Float(fixSqrt(FIX_)));
+		//Serial.printf(" ang: %d dot: %d", theta, dot);
+		// Serial.printf(" vecNor: "); 
+		// vec3fPrint(&vecTmp);
+		// Serial.printf("\n\r");
 }
 
 void mat3fMagAlign(struct vec3f * vecMag, struct mat3f * matOri, intFix weight, intFix max)

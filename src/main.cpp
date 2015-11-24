@@ -62,7 +62,7 @@ void loop()
   		mat3fAccAlign(&acc.vecAcc, &matOri, ACC_ALIGN_SPEED, ACC_ALIGN_MAX);
   		update = 1;
   	}
-	
+
   	/*
   	magGetAvailability(&mag);
 	if (mag.flagNewAvail) {
@@ -80,11 +80,9 @@ void loop()
   	if (timeSince(timerSend) > 10000) {
   		intervalSend = timeSince(timerSend);
   		timerSend += intervalSend;
-  		Serial.printf("C: %d S: %d  ", intervalCalc, intervalSend);
+  		//Serial.printf("C: %d S: %d  ", intervalCalc, intervalSend);
   		
-  		//mat3fSend(&matOri);
-  		//vec3fPrint(&gyr.vecBias);
-  		//Serial.printf("\n\r");
+  		mat3fSend(&matOri);
  	 	Serial.send_now();
   	}
 }

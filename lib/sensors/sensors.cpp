@@ -217,19 +217,19 @@ void gyrUpdate(struct gyro * gyr)
 	// MAX ANGLE IS SUPPOSED TO BE PI not 2PI change this!#!#!#!#!#!#!#
 	switch(gyr->FS) {
 		case DPS_245: 
-			gyr->vecAng.data[0] = (((int64_t)gyr->vecGyr.data[0] << 47) / 360 * 35 / 4000 * microsElapsed / 1000000) >> 16;
-			gyr->vecAng.data[1] = (((int64_t)gyr->vecGyr.data[1] << 47) / 360 * 35 / 4000 * microsElapsed / 1000000) >> 16;
-			gyr->vecAng.data[2] = (((int64_t)gyr->vecGyr.data[2] << 47) / 360 * 35 / 4000 * microsElapsed / 1000000) >> 16;
+			gyr->vecAng.data[0] = (((int64_t)gyr->vecGyr.data[0] << 46) / 360 * 35 / 4000 * microsElapsed / 1000000) >> 16;
+			gyr->vecAng.data[1] = (((int64_t)gyr->vecGyr.data[1] << 46) / 360 * 35 / 4000 * microsElapsed / 1000000) >> 16;
+			gyr->vecAng.data[2] = (((int64_t)gyr->vecGyr.data[2] << 46) / 360 * 35 / 4000 * microsElapsed / 1000000) >> 16;
 			break;
 		case DPS_500: 
-			gyr->vecAng.data[0] = (((int64_t)gyr->vecGyr.data[0] << 47) / 360 * 35 / 2000 * microsElapsed / 1000000) >> 16;
-			gyr->vecAng.data[1] = (((int64_t)gyr->vecGyr.data[1] << 47) / 360 * 35 / 2000 * microsElapsed / 1000000) >> 16;
-			gyr->vecAng.data[2] = (((int64_t)gyr->vecGyr.data[2] << 47) / 360 * 35 / 2000 * microsElapsed / 1000000) >> 16;
+			gyr->vecAng.data[0] = (((int64_t)gyr->vecGyr.data[0] << 46) / 360 * 35 / 2000 * microsElapsed / 1000000) >> 16;
+			gyr->vecAng.data[1] = (((int64_t)gyr->vecGyr.data[1] << 46) / 360 * 35 / 2000 * microsElapsed / 1000000) >> 16;
+			gyr->vecAng.data[2] = (((int64_t)gyr->vecGyr.data[2] << 46) / 360 * 35 / 2000 * microsElapsed / 1000000) >> 16;
 			break;
 		case DPS_2000: 
-			gyr->vecAng.data[0] = (((int64_t)gyr->vecGyr.data[0] << 47) / 360 * 35 /  500 * microsElapsed / 1000000) >> 16;
-			gyr->vecAng.data[1] = (((int64_t)gyr->vecGyr.data[1] << 47) / 360 * 35 /  500 * microsElapsed / 1000000) >> 16;
-			gyr->vecAng.data[2] = (((int64_t)gyr->vecGyr.data[2] << 47) / 360 * 35 /  500 * microsElapsed / 1000000) >> 16;
+			gyr->vecAng.data[0] = (((int64_t)gyr->vecGyr.data[0] << 46) / 360 * 35 /  500 * microsElapsed / 1000000) >> 16;
+			gyr->vecAng.data[1] = (((int64_t)gyr->vecGyr.data[1] << 46) / 360 * 35 /  500 * microsElapsed / 1000000) >> 16;
+			gyr->vecAng.data[2] = (((int64_t)gyr->vecGyr.data[2] << 46) / 360 * 35 /  500 * microsElapsed / 1000000) >> 16;
 		break;
 	}
 	gyr->flagNewAvail = 0;
