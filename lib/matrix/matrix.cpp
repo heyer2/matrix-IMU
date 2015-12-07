@@ -44,6 +44,13 @@ void vec3Div(struct vec3 * vec, float k)
 	vec->data[2] /= k;
 }
 
+void vec3DivVec(struct vec3 * vecRes, struct vec3 * vec)
+{
+	vecRes->data[0] /= vec->data[0];
+	vecRes->data[1] /= vec->data[1];
+	vecRes->data[2] /= vec->data[2];
+}
+
 void vec3Mult(struct vec3 * vec, float k)
 {
 	vec->data[0] *= k;
@@ -51,11 +58,11 @@ void vec3Mult(struct vec3 * vec, float k)
 	vec->data[2] *= k;
 }
 
-void vec3MultVec(struct vec3 * vec, struct vec3 * vecFac)
+void vec3MultVec(struct vec3 * vecRes, struct vec3 * vec)
 {
-	vec->data[0] *= vecFac->data[0];
-	vec->data[1] *= vecFac->data[1];
-	vec->data[2] *= vecFac->data[2];
+	vecRes->data[0] *= vec->data[0];
+	vecRes->data[1] *= vec->data[1];
+	vecRes->data[2] *= vec->data[2];
 }
 
 void vec3Add(struct vec3 * vecA, struct vec3 * vecB, struct vec3 * vecOut)

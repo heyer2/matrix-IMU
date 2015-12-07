@@ -10,7 +10,7 @@
 void setup()
 {
 	Serial.begin(SERIAL_BAUD);
-	delay(400);
+	delay(1500);
 	Wire.begin();
 	Wire.setRate(I2C_RATE_400);
 }
@@ -46,7 +46,6 @@ void loop()
 	};
 	
 	int update = 0;
-	
 	/*
 	gyrGetAvailability(&gyr);
 	if (gyr.flagNewAvail) {
@@ -54,24 +53,21 @@ void loop()
 		mat3fGyrRot(&gyr.vecAng, &matOri);
 		update = 1;
 	}
-	*/
-	
+
 	accGetAvailability(&acc);
 	if (acc.flagNewAvail) {
   		accUpdate(&acc);
   		mat3fAccAlign(&acc.vecAcc, &matOri, ACC_ALIGN_SPEED, ACC_ALIGN_MAX);
   		update = 1;
   	}
-
-  	/*
+  	
   	magGetAvailability(&mag);
 	if (mag.flagNewAvail) {
   		magUpdate(&mag);
-  		mat3MagAlign(&mag.vecMag, &matOri, MAG_ALIGN_SPEED, MAG_ALIGN_MAX);
+  		mat3fMagAlign(&mag.vecMag, &matOri, MAG_ALIGN_SPEED, MAG_ALIGN_MAX);
   		update = 1;
   	}
- 	*/
-
+	*/
   	if (update) {
   		intervalCalc = timeSince(timerCalc);
   		timerCalc += intervalCalc;
@@ -80,9 +76,19 @@ void loop()
   	if (timeSince(timerSend) > 10000) {
   		intervalSend = timeSince(timerSend);
   		timerSend += intervalSend;
-  		//Serial.printf("C: %d S: %d  ", intervalCalc, intervalSend);
-  		
-  		mat3fSend(&matOri);
+
+  		float record = 0;
+  		for (int i = -1000; i < 1000; i++)
+  		{	
+  			intFix ang = FIX_UNITY / 1000 * i;
+  			Serial.printf("in: %f sin: %f approx: %f \n\r",fix2Float(ang), fix2Float(fixSin(ang)), fix2Float(fixSin2(ang)));
+  			float tmp = abs(fix2Float(fixSin(ang)) - fix2Float(fixSin2(ang)));
+  			if (tmp > record)
+  				record = tmp;
+  		}
+  		Serial.printf("Rec: %f \n\r",record);
+  		delay(1000);
+  		//mat3fSend(&matOri);
  	 	Serial.send_now();
   	}
 }

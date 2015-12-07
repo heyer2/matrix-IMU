@@ -37,7 +37,8 @@
 #define GYR_LSB_500DPS  0.0003054326190
 #define GYR_LSB_2000DPS 0.0012217304764
 
-#define GYR_BIAS_SAMPLES 1000
+#define GYR_BIAS_SAMPLES_DISCARD 200
+#define GYR_BIAS_SAMPLES_USE 1000
 
 
 #define ACC_SAD 0x19
@@ -114,13 +115,13 @@
 #define MAG_LSB_8x1GAUSS_XY (1.0/230)
 #define MAG_LSB_8x1GAUSS_Z  (1.0/205)
 
-#define MAG_BIAS_X (-4.1770588056896)
-#define MAG_BIAS_Y (-48.569600649290)
-#define MAG_BIAS_Z (398.835722468053)
+#define MAG_GAIN_X float2Fix(0.01326922)//(-4.1770588056896)
+#define MAG_GAIN_Y float2Fix(0.01278126)//(-48.569600649290)
+#define MAG_GAIN_Z float2Fix(0.01115709)//(398.835722468053)
 
-#define MAG_GAIN_X (0.00234202173981799)
-#define MAG_GAIN_Y (0.00241234250943554)
-#define MAG_GAIN_Z (0.00277519214826859)
+#define MAG_BIAS_X float2Fix(0.00032732)
+#define MAG_BIAS_Y float2Fix(0.001090738056514)
+#define MAG_BIAS_Z float2Fix(0.012563747364052)
 
 
 static void I2CWriteReg(char SAD, char SUB, char byte)
@@ -193,8 +194,8 @@ void gyrGetAvailability(struct gyro * gyr)
 	gyr->flagNewAvail = (byte & GYR_SUB_STATUS_MASK_NEWSET) > 0;
 }
 
-void gyrUpdate(struct gyro * gyr)
-{	
+static void gyrGetRaw(struct gyro * gyr, struct vec3f * vec)
+{
 	I2CReadRegSeries(GYR_SAD, GYR_SUB_OUT, 6);
 	unsigned int XL = Wire.read();
 	unsigned int XH = Wire.read();
@@ -203,58 +204,74 @@ void gyrUpdate(struct gyro * gyr)
 	unsigned int ZL = Wire.read();
 	unsigned int ZH = Wire.read();	
 	
-	
-	gyr->vecGyr.data[0] = (int16_t)(XH << 8 | XL);
-	gyr->vecGyr.data[1] = (int16_t)(YH << 8 | YL);
-	gyr->vecGyr.data[2] = (int16_t)(ZH << 8 | ZL);
-	
+	vec->data[0] = (int16_t)(XH << 8 | XL);
+	vec->data[1] = (int16_t)(YH << 8 | YL);
+	vec->data[2] = (int16_t)(ZH << 8 | ZL);
+
+	gyr->flagNewAvail = 0;
+}
+
+void gyrUpdate(struct gyro * gyr)
+{	
+	gyrGetRaw(gyr, &gyr->vecGyr);
+	vec3fAccum(&gyr->vecGyr, &gyr->vecBias);
 
 	unsigned int microsElapsed = micros() - gyr->timeUsed;
 	gyr->timeUsed += microsElapsed;
 
-	vec3fAccum(&gyr->vecGyr, &gyr->vecBias);
-
 	// MAX ANGLE IS SUPPOSED TO BE PI not 2PI change this!#!#!#!#!#!#!#
 	switch(gyr->FS) {
 		case DPS_245: 
-			gyr->vecAng.data[0] = (((int64_t)gyr->vecGyr.data[0] << 46) / 360 * 35 / 4000 * microsElapsed / 1000000) >> 16;
-			gyr->vecAng.data[1] = (((int64_t)gyr->vecGyr.data[1] << 46) / 360 * 35 / 4000 * microsElapsed / 1000000) >> 16;
-			gyr->vecAng.data[2] = (((int64_t)gyr->vecGyr.data[2] << 46) / 360 * 35 / 4000 * microsElapsed / 1000000) >> 16;
+			gyr->vecAng.data[0] = (((int64_t)gyr->vecGyr.data[0] << 45) / 360 * 35 / 4000 * microsElapsed / 1000000) >> 16;
+			gyr->vecAng.data[1] = (((int64_t)gyr->vecGyr.data[1] << 45) / 360 * 35 / 4000 * microsElapsed / 1000000) >> 16;
+			gyr->vecAng.data[2] = (((int64_t)gyr->vecGyr.data[2] << 45) / 360 * 35 / 4000 * microsElapsed / 1000000) >> 16;
 			break;
 		case DPS_500: 
-			gyr->vecAng.data[0] = (((int64_t)gyr->vecGyr.data[0] << 46) / 360 * 35 / 2000 * microsElapsed / 1000000) >> 16;
-			gyr->vecAng.data[1] = (((int64_t)gyr->vecGyr.data[1] << 46) / 360 * 35 / 2000 * microsElapsed / 1000000) >> 16;
-			gyr->vecAng.data[2] = (((int64_t)gyr->vecGyr.data[2] << 46) / 360 * 35 / 2000 * microsElapsed / 1000000) >> 16;
+			gyr->vecAng.data[0] = (((int64_t)gyr->vecGyr.data[0] << 45) / 360 * 35 / 2000 * microsElapsed / 1000000) >> 16;
+			gyr->vecAng.data[1] = (((int64_t)gyr->vecGyr.data[1] << 45) / 360 * 35 / 2000 * microsElapsed / 1000000) >> 16;
+			gyr->vecAng.data[2] = (((int64_t)gyr->vecGyr.data[2] << 45) / 360 * 35 / 2000 * microsElapsed / 1000000) >> 16;
 			break;
 		case DPS_2000: 
-			gyr->vecAng.data[0] = (((int64_t)gyr->vecGyr.data[0] << 46) / 360 * 35 /  500 * microsElapsed / 1000000) >> 16;
-			gyr->vecAng.data[1] = (((int64_t)gyr->vecGyr.data[1] << 46) / 360 * 35 /  500 * microsElapsed / 1000000) >> 16;
-			gyr->vecAng.data[2] = (((int64_t)gyr->vecGyr.data[2] << 46) / 360 * 35 /  500 * microsElapsed / 1000000) >> 16;
+			gyr->vecAng.data[0] = (((int64_t)gyr->vecGyr.data[0] << 45) / 360 * 35 /  500 * microsElapsed / 1000000) >> 16;
+			gyr->vecAng.data[1] = (((int64_t)gyr->vecGyr.data[1] << 45) / 360 * 35 /  500 * microsElapsed / 1000000) >> 16;
+			gyr->vecAng.data[2] = (((int64_t)gyr->vecGyr.data[2] << 45) / 360 * 35 /  500 * microsElapsed / 1000000) >> 16;
 		break;
 	}
-	gyr->flagNewAvail = 0;
 }
 
 void gyrGetBias(struct gyro * gyr)
 {	
 	struct vec3f vecTmp;
-	vec3fZero(&vecTmp);
 	vec3fZero(&gyr->vecBias);
 	
-	for (int i = 0; i < GYR_BIAS_SAMPLES; i++) {
+	for (int i = 0; i < GYR_BIAS_SAMPLES_DISCARD; i++) {
 		while(!gyr->flagNewAvail)
 			gyrGetAvailability(gyr);
-		gyrUpdate(gyr);
-		vec3fAccum(&vecTmp, &gyr->vecGyr);
+		gyrGetRaw(gyr, &vecTmp);
+		// Serial.printf(" curtmp: %d %d %d ", vecTmp.data[0], vecTmp.data[1], vecTmp.data[2]);
+		// Serial.printf(" tr: %d\n\r", i);
+		// Serial.send_now();
 	}
-	gyr->vecBias.data[0] = -vecTmp.data[0] / GYR_BIAS_SAMPLES;
-	gyr->vecBias.data[1] = -vecTmp.data[1] / GYR_BIAS_SAMPLES;
-	gyr->vecBias.data[2] = -vecTmp.data[2] / GYR_BIAS_SAMPLES;
+
+	for (int i = 0; i < GYR_BIAS_SAMPLES_USE; i++) {
+		while(!gyr->flagNewAvail)
+			gyrGetAvailability(gyr);
+		gyrGetRaw(gyr, &vecTmp);
+		vec3fAccum(&gyr->vecBias, &vecTmp);
+		// Serial.printf(" curbias: %d %d %d ", gyr->vecBias.data[0], gyr->vecBias.data[1], gyr->vecBias.data[2]);
+		// Serial.printf(" curtmp: %d %d %d ", vecTmp.data[0], vecTmp.data[1], vecTmp.data[2]);
+		// Serial.printf(" i: %d\n\r", i);
+		// Serial.send_now();
+	}
+	gyr->vecBias.data[0] /= -GYR_BIAS_SAMPLES_USE;
+	gyr->vecBias.data[1] /= -GYR_BIAS_SAMPLES_USE;
+	gyr->vecBias.data[2] /= -GYR_BIAS_SAMPLES_USE;
+	// Serial.printf(" Finalbias: %d %d %d ", gyr->vecBias.data[0], gyr->vecBias.data[1], gyr->vecBias.data[2]);
 }
 
 void accSetDefault(struct acce * acc) 
 {
-	acc->ODR = a_HZ_25; //25
+	acc->ODR = a_HZ_100; //25
 	acc->FS  = G_2;
 
 	vec3fZero(&acc->vecAcc);
@@ -295,6 +312,8 @@ void accGetAvailability(struct acce * acc)
 
 void accUpdate(struct acce * acc)
 {	
+	// Serial.printf("Time taken: ");
+	// int time = micros();
 	I2CReadRegSeries(ACC_SAD, ACC_SUB_OUT, 6);
 	unsigned int XL = Wire.read();
 	unsigned int XH = Wire.read();
@@ -302,14 +321,14 @@ void accUpdate(struct acce * acc)
 	unsigned int YH = Wire.read();
 	unsigned int ZL = Wire.read();
 	unsigned int ZH = Wire.read();	
+	// Serial.printf("%d \n\r", micros()-time);
+	acc->vecAcc.data[0] = (int16_t)(XH << 8 | XL); // The value is stored in the upper 12 bits
+	acc->vecAcc.data[1] = (int16_t)(YH << 8 | YL); // Also, right shift of signed int is implementation defined
+	acc->vecAcc.data[2] = (int16_t)(ZH << 8 | ZL);
 	
-	acc->vecAcc.data[0] = (int16_t)(XH << 8 | XL) >> 4; // The value is stored in the upper 12 bits
-	acc->vecAcc.data[1] = (int16_t)(YH << 8 | YL) >> 4; // Also, right shift of signed int is implementation defined
-	acc->vecAcc.data[2] = (int16_t)(ZH << 8 | ZL) >> 4;
-	
-	acc->vecAcc.data[0] <<= 16;
-	acc->vecAcc.data[1] <<= 16;
-	acc->vecAcc.data[2] <<= 16;
+	acc->vecAcc.data[0] <<= 16 - FIX_BITS_BEFORE_DOT; // CAN DO MORE
+	acc->vecAcc.data[1] <<= 16 - FIX_BITS_BEFORE_DOT;
+	acc->vecAcc.data[2] <<= 16 - FIX_BITS_BEFORE_DOT;
 
 	/* DEBUG
 	switch(acc->FS) {
@@ -324,7 +343,7 @@ void accUpdate(struct acce * acc)
 
 void magSetDefault(struct magn * mag) 
 {
-	mag->ODR = m_HZ_30;
+	mag->ODR = m_HZ_75;
 	mag->FS  = GAUSS_1x3;
 
 	vec3fZero(&mag->vecMag);
@@ -386,7 +405,6 @@ void magGetAvailability(struct magn * mag)
 
 void magUpdate(struct magn * mag)
 {	
-	
 	I2CReadRegSeries(MAG_SAD, MAG_SUB_OUT, 6);
 	unsigned int XH = Wire.read();
 	unsigned int XL = Wire.read();
@@ -399,16 +417,20 @@ void magUpdate(struct magn * mag)
 	mag->vecMag.data[1] = (int16_t)(YH << 8 | YL);
 	mag->vecMag.data[2] = (int16_t)(ZH << 8 | ZL);
 	
-	// These are preset, because only a sigle calibration was done
-	/* DEBUG
-	struct vec3f vecBias;
-	struct vec3f vecGain;
-	vec3fSet(&vecBias, 0, 0 ,0);
-	vec3fSet(&vecBias, -MAG_BIAS_X, -MAG_BIAS_Y, -MAG_BIAS_Z);
-	vec3fSet(&vecGain, MAG_GAIN_X, MAG_GAIN_Y, MAG_GAIN_Z);
+	mag->vecMag.data[0] <<= 16 - FIX_BITS_BEFORE_DOT;
+	mag->vecMag.data[1] <<= 16 - FIX_BITS_BEFORE_DOT;
+	mag->vecMag.data[2] <<= 16 - FIX_BITS_BEFORE_DOT;
 
+	struct vec3f vecBias;
+	vec3fSet(&vecBias, -MAG_BIAS_X, -MAG_BIAS_Y, -MAG_BIAS_Z);
 	vec3fAccum(&mag->vecMag, &vecBias);
-	vec3fMultVec(&mag->vecMag, &vecGain);
-	*/
+
+	struct vec3f vecGain;
+	vec3fSet(&vecGain, MAG_GAIN_X, MAG_GAIN_Y, MAG_GAIN_Z);
+	vec3fDivVec(&mag->vecMag, &vecGain);
+
+	// vec3fPrint(&mag->vecMag);
+	// Serial.printf("\n\r");
+
 	mag->flagNewAvail = 0;
 }
