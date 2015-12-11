@@ -29,10 +29,6 @@
 
 #define GYR_SUB_OUT 0x28 // Initial register, use incrementing read
 
-#define GYR_LSB_245DPS  0.0001527163095
-#define GYR_LSB_500DPS  0.0003054326190
-#define GYR_LSB_2000DPS 0.0012217304764
-
 #define GYR_BIAS_SAMPLES_DISCARD 200
 #define GYR_BIAS_SAMPLES_USE 1000
 
@@ -60,12 +56,6 @@
 #define ACC_SUB_STATUS_MASK_NEWSET 0x08
 
 #define ACC_SUB_OUT 0x28 // Initial register, use incrementing read
-
-#define ACC_LSB_2G  0.001
-#define ACC_LSB_4G  0.002
-#define ACC_LSB_8G  0.004
-#define ACC_LSB_16G 0.012
-
 
 #define MAG_SAD 0x1E
 
@@ -95,21 +85,6 @@
 #define MAG_SUB_SR_MASK_RELEVANT 0x03
 
 #define MAG_SUB_OUT 0x03
-
-#define MAG_LSB_1x3GAUSS_XY (1.0/1100)
-#define MAG_LSB_1x3GAUSS_Z  (1.0/980)
-#define MAG_LSB_1x9GAUSS_XY (1.0/855)
-#define MAG_LSB_1x9GAUSS_Z  (1.0/760)
-#define MAG_LSB_2x5GAUSS_XY (1.0/670)
-#define MAG_LSB_2x5GAUSS_Z  (1.0/600)
-#define MAG_LSB_4x0GAUSS_XY (1.0/450)
-#define MAG_LSB_4x0GAUSS_Z  (1.0/400)
-#define MAG_LSB_4x7GAUSS_XY (1.0/400)
-#define MAG_LSB_4x7GAUSS_Z  (1.0/355)
-#define MAG_LSB_5x6GAUSS_XY (1.0/330)
-#define MAG_LSB_5x6GAUSS_Z  (1.0/295)
-#define MAG_LSB_8x1GAUSS_XY (1.0/230)
-#define MAG_LSB_8x1GAUSS_Z  (1.0/205)
 
 #define MAG_GAIN_X float2Fix(0.01326922)
 #define MAG_GAIN_Y float2Fix(0.01278126)
