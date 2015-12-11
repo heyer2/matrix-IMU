@@ -320,13 +320,13 @@ void mat3fOrthoFix(struct mat3f * mat)
 	
 	intFix err = vec3fDotProd(&vecOldX, &vecOldY);
 	struct vec3f vecX = vecOldY;
-	vec3fMult(&vecX, (-0.5) * err);
+	vec3fMult(&vecX, -err >> 1);
 	vec3fAccum(&vecX, &vecOldX);
 	vec3fNorm(&vecX);
 	mat3fSetColumn(&vecX, mat, 0);
 	
 	struct vec3f vecY = vecOldX;
-	vec3fMult(&vecY, (-0.5) * err);
+	vec3fMult(&vecY, -err >> 1);
 	vec3fAccum(&vecY, &vecOldY);
 	vec3fNorm(&vecY);
 	mat3fSetColumn(&vecY, mat, 1);

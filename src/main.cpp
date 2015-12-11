@@ -8,6 +8,13 @@
 #define SERIAL_STARTUP_DELAY 1000 // In milliseconds
 #define SERIAL_SEND_INTERVAL 10000 // In microseconds
 
+#define MAG_ALIGN_MAX   float2Fix(0.01) // Max jump in radians
+#define MAG_ALIGN_SPEED float2Fix(0.05) // Defines alignment speed
+#define ACC_ALIGN_MAX   float2Fix(0.01) // Max jump in radians
+#define ACC_ALIGN_SPEED float2Fix(0.05) // Defines alignment speed
+
+#define ORIMAT_DET_ERR_LIM float2Fix(0.005)
+
 void setup()
 {
 	Serial.begin(SERIAL_BAUD);
@@ -66,7 +73,10 @@ void loop()
 		mat3fMagAlign(&mag.vecMag, &matOri, MAG_ALIGN_SPEED, MAG_ALIGN_MAX);
 		update = 1;
   }
-  
+
+  if (abs(mat3fDet(&matOri) - FIX_UNITY) > ORIMAT_DET_ERR_LIM)
+    mat3fOrthoFix(&matOri);
+
 	if (timeSince(timerSend) > SERIAL_SEND_INTERVAL) {
 		intervalSend = timeSince(timerSend);
 		timerSend += intervalSend;
