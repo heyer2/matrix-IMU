@@ -1,14 +1,10 @@
 #include <stdint.h>
 #include <sensors.h>
-#include <matrix.h>
 #include <matrixFix.h>
 #include <i2c_t3.h> // If using Teensy 3.x
 //#include "Wire.h" // If using arduino
 
 #include "Arduino.h"
-
-
-#define MILLIS2SEC 0.001;
 
 #define GYR_SAD 0x6B
 
@@ -58,7 +54,7 @@
 #define ACC_SUB_CTRL4_MASK_FS_4G  0x10
 #define ACC_SUB_CTRL4_MASK_FS_8G  0x20
 #define ACC_SUB_CTRL4_MASK_FS_16G 0x30
-#define ACC_SUB_CTRL4_HIGHRES     0x08 // If disabled, accelerometer data is stored in the upper 12 bits
+#define ACC_SUB_CTRL4_HIGHRES     0x08 // If disabled, accelerometer data is supposedly stored in the upper 12 bits 
 
 #define ACC_SUB_STATUS 			   0x27
 #define ACC_SUB_STATUS_MASK_NEWSET 0x08
@@ -81,7 +77,7 @@
 #define MAG_SUB_CRA_MASK_ODR_15HZ   0x10
 #define MAG_SUB_CRA_MASK_ODR_30HZ  	0x14
 #define MAG_SUB_CRA_MASK_ODR_75HZ	0x18
-#define MAG_SUB_CRA_MASK_ODR_220HZ	0x1C  // More like 250/333, possibly related to magnetomer ready hack
+#define MAG_SUB_CRA_MASK_ODR_220HZ	0x1C
 
 #define MAG_SUB_CRB 				 0x01
 #define MAG_SUB_CRB_MASK_FS_1x3GAUSS 0x20
@@ -115,14 +111,13 @@
 #define MAG_LSB_8x1GAUSS_XY (1.0/230)
 #define MAG_LSB_8x1GAUSS_Z  (1.0/205)
 
-#define MAG_GAIN_X float2Fix(0.01326922)//(-4.1770588056896)
-#define MAG_GAIN_Y float2Fix(0.01278126)//(-48.569600649290)
-#define MAG_GAIN_Z float2Fix(0.01115709)//(398.835722468053)
+#define MAG_GAIN_X float2Fix(0.01326922)
+#define MAG_GAIN_Y float2Fix(0.01278126)
+#define MAG_GAIN_Z float2Fix(0.01115709)
 
 #define MAG_BIAS_X float2Fix(0.00032732)
 #define MAG_BIAS_Y float2Fix(0.001090738056514)
 #define MAG_BIAS_Z float2Fix(0.012563747364052)
-
 
 static void I2CWriteReg(char SAD, char SUB, char byte)
 {
@@ -141,7 +136,8 @@ static char I2CReadReg(char SAD, char SUB)
 	return Wire.read();
 }
 
-static void I2CReadRegSeries(char SAD, char SUB, int bytes) // Will hold the line until all read
+ // Will hold the line until all read
+static void I2CReadRegSeries(char SAD, char SUB, int bytes)
 {	
 	Wire.beginTransmission(SAD);
 	Wire.write(SUB | 0x80); // 0x80 activates pointer incrementation
@@ -219,22 +215,21 @@ void gyrUpdate(struct gyro * gyr)
 	unsigned int microsElapsed = micros() - gyr->timeUsed;
 	gyr->timeUsed += microsElapsed;
 
-	// MAX ANGLE IS SUPPOSED TO BE PI not 2PI change this!#!#!#!#!#!#!#
 	switch(gyr->FS) {
 		case DPS_245: 
-			gyr->vecAng.data[0] = (((int64_t)gyr->vecGyr.data[0] << 45) / 360 * 35 / 4000 * microsElapsed / 1000000) >> 16;
-			gyr->vecAng.data[1] = (((int64_t)gyr->vecGyr.data[1] << 45) / 360 * 35 / 4000 * microsElapsed / 1000000) >> 16;
-			gyr->vecAng.data[2] = (((int64_t)gyr->vecGyr.data[2] << 45) / 360 * 35 / 4000 * microsElapsed / 1000000) >> 16;
+			gyr->vecAng.data[0] = (((int64_t)gyr->vecGyr.data[0] << 46) / 360 * 35 / 4000 * microsElapsed / 1000000) >> 16;
+			gyr->vecAng.data[1] = (((int64_t)gyr->vecGyr.data[1] << 46) / 360 * 35 / 4000 * microsElapsed / 1000000) >> 16;
+			gyr->vecAng.data[2] = (((int64_t)gyr->vecGyr.data[2] << 46) / 360 * 35 / 4000 * microsElapsed / 1000000) >> 16;
 			break;
 		case DPS_500: 
-			gyr->vecAng.data[0] = (((int64_t)gyr->vecGyr.data[0] << 45) / 360 * 35 / 2000 * microsElapsed / 1000000) >> 16;
-			gyr->vecAng.data[1] = (((int64_t)gyr->vecGyr.data[1] << 45) / 360 * 35 / 2000 * microsElapsed / 1000000) >> 16;
-			gyr->vecAng.data[2] = (((int64_t)gyr->vecGyr.data[2] << 45) / 360 * 35 / 2000 * microsElapsed / 1000000) >> 16;
+			gyr->vecAng.data[0] = (((int64_t)gyr->vecGyr.data[0] << 46) / 360 * 35 / 2000 * microsElapsed / 1000000) >> 16;
+			gyr->vecAng.data[1] = (((int64_t)gyr->vecGyr.data[1] << 46) / 360 * 35 / 2000 * microsElapsed / 1000000) >> 16;
+			gyr->vecAng.data[2] = (((int64_t)gyr->vecGyr.data[2] << 46) / 360 * 35 / 2000 * microsElapsed / 1000000) >> 16;
 			break;
 		case DPS_2000: 
-			gyr->vecAng.data[0] = (((int64_t)gyr->vecGyr.data[0] << 45) / 360 * 35 /  500 * microsElapsed / 1000000) >> 16;
-			gyr->vecAng.data[1] = (((int64_t)gyr->vecGyr.data[1] << 45) / 360 * 35 /  500 * microsElapsed / 1000000) >> 16;
-			gyr->vecAng.data[2] = (((int64_t)gyr->vecGyr.data[2] << 45) / 360 * 35 /  500 * microsElapsed / 1000000) >> 16;
+			gyr->vecAng.data[0] = (((int64_t)gyr->vecGyr.data[0] << 46) / 360 * 35 /  500 * microsElapsed / 1000000) >> 16;
+			gyr->vecAng.data[1] = (((int64_t)gyr->vecGyr.data[1] << 46) / 360 * 35 /  500 * microsElapsed / 1000000) >> 16;
+			gyr->vecAng.data[2] = (((int64_t)gyr->vecGyr.data[2] << 46) / 360 * 35 /  500 * microsElapsed / 1000000) >> 16;
 		break;
 	}
 }
@@ -248,9 +243,6 @@ void gyrGetBias(struct gyro * gyr)
 		while(!gyr->flagNewAvail)
 			gyrGetAvailability(gyr);
 		gyrGetRaw(gyr, &vecTmp);
-		// Serial.printf(" curtmp: %d %d %d ", vecTmp.data[0], vecTmp.data[1], vecTmp.data[2]);
-		// Serial.printf(" tr: %d\n\r", i);
-		// Serial.send_now();
 	}
 
 	for (int i = 0; i < GYR_BIAS_SAMPLES_USE; i++) {
@@ -258,20 +250,15 @@ void gyrGetBias(struct gyro * gyr)
 			gyrGetAvailability(gyr);
 		gyrGetRaw(gyr, &vecTmp);
 		vec3fAccum(&gyr->vecBias, &vecTmp);
-		// Serial.printf(" curbias: %d %d %d ", gyr->vecBias.data[0], gyr->vecBias.data[1], gyr->vecBias.data[2]);
-		// Serial.printf(" curtmp: %d %d %d ", vecTmp.data[0], vecTmp.data[1], vecTmp.data[2]);
-		// Serial.printf(" i: %d\n\r", i);
-		// Serial.send_now();
 	}
 	gyr->vecBias.data[0] /= -GYR_BIAS_SAMPLES_USE;
 	gyr->vecBias.data[1] /= -GYR_BIAS_SAMPLES_USE;
 	gyr->vecBias.data[2] /= -GYR_BIAS_SAMPLES_USE;
-	// Serial.printf(" Finalbias: %d %d %d ", gyr->vecBias.data[0], gyr->vecBias.data[1], gyr->vecBias.data[2]);
 }
 
 void accSetDefault(struct acce * acc) 
 {
-	acc->ODR = a_HZ_100; //25
+	acc->ODR = a_HZ_100;
 	acc->FS  = G_2;
 
 	vec3fZero(&acc->vecAcc);
@@ -312,32 +299,22 @@ void accGetAvailability(struct acce * acc)
 
 void accUpdate(struct acce * acc)
 {	
-	// Serial.printf("Time taken: ");
-	// int time = micros();
 	I2CReadRegSeries(ACC_SAD, ACC_SUB_OUT, 6);
 	unsigned int XL = Wire.read();
 	unsigned int XH = Wire.read();
 	unsigned int YL = Wire.read();
 	unsigned int YH = Wire.read();
 	unsigned int ZL = Wire.read();
-	unsigned int ZH = Wire.read();	
-	// Serial.printf("%d \n\r", micros()-time);
-	acc->vecAcc.data[0] = (int16_t)(XH << 8 | XL); // The value is stored in the upper 12 bits
-	acc->vecAcc.data[1] = (int16_t)(YH << 8 | YL); // Also, right shift of signed int is implementation defined
+	unsigned int ZH = Wire.read();
+
+	acc->vecAcc.data[0] = (int16_t)(XH << 8 | XL);
+	acc->vecAcc.data[1] = (int16_t)(YH << 8 | YL);
 	acc->vecAcc.data[2] = (int16_t)(ZH << 8 | ZL);
 	
-	acc->vecAcc.data[0] <<= 16 - FIX_BITS_BEFORE_DOT; // CAN DO MORE
+	acc->vecAcc.data[0] <<= 16 - FIX_BITS_BEFORE_DOT;
 	acc->vecAcc.data[1] <<= 16 - FIX_BITS_BEFORE_DOT;
 	acc->vecAcc.data[2] <<= 16 - FIX_BITS_BEFORE_DOT;
 
-	/* DEBUG
-	switch(acc->FS) {
-		case G_2 : vec3fMult(&acc->vecAcc, ACC_LSB_2G) ; break;
-		case G_4 : vec3fMult(&acc->vecAcc, ACC_LSB_4G) ; break;
-		case G_8 : vec3fMult(&acc->vecAcc, ACC_LSB_8G) ; break;
-		case G_16: vec3fMult(&acc->vecAcc, ACC_LSB_16G); break;
-	}
-	*/
 	acc->flagNewAvail = 0;
 }
 
@@ -428,9 +405,6 @@ void magUpdate(struct magn * mag)
 	struct vec3f vecGain;
 	vec3fSet(&vecGain, MAG_GAIN_X, MAG_GAIN_Y, MAG_GAIN_Z);
 	vec3fDivVec(&mag->vecMag, &vecGain);
-
-	// vec3fPrint(&mag->vecMag);
-	// Serial.printf("\n\r");
 
 	mag->flagNewAvail = 0;
 }

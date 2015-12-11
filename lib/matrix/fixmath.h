@@ -61,31 +61,62 @@ inline uintFix fixSqrt(ulongFix sq) {
 	}
 	return res << FIX_SHIFTS / 2;
 }
-
+ 
 inline intFix fixSin(intFix theta) {
-	return float2Fix(sin(PI * fix2Float(theta)));
+	static const intFix switchVal = float2Fix(0.1435); // The point where sin(x) = x becomes worse than the parabola approximation
+	static const intFix fixPi = float2Fix(3.14159265359);
+	theta <<= FIX_BITS_BEFORE_DOT;
+	theta >>= FIX_BITS_BEFORE_DOT;
+
+	if (abs(theta) < switchVal)
+		return fixMult(theta, fixPi);
+	else {
+		intFix tmp = (theta - fixMult(abs(theta), theta)) << 2; // Initial step, very imprecise
+		return (tmp >> 1) + (tmp >> 2) + (fixMult(abs(tmp), tmp) >> 2); // Precision increase
+	}
 }
-
-
-// This function requires input between -1 and 1
-inline intFix fixSin2(intFix theta) {
-	intFix tmp = (theta - fixMult(abs(theta), theta)) << 2; // Initial step, very imprecise
-	return (tmp >> 1) + (tmp >> 2) + (fixMult(abs(tmp), tmp) >> 2); // Precision increase
-}
-
 
 inline intFix fixCos(intFix theta) {
-	return float2Fix(cos(PI * fix2Float(theta)));
+	theta += FIX_UNITY >> 1;
+	return fixSin(theta);
 }
 
-inline intFix fixAcos(intFix input) {
-	return float2Fix(acos(fix2Float(input)) / (PI));
+inline intFix fixAtan2(intFix y, intFix x) {
+	static const intFix k = float2Fix(0.0868985989);
+
+	intFix z, tmp;
+	if (abs(y) <= x) {
+		z = fixDiv(y, x);
+		tmp = (FIX_UNITY >> 2) + k - fixMult(k, abs(z));
+		return fixMult(z, tmp);
+	}
+	else if (y > abs(x)) {
+		z = fixDiv(x, y);
+		tmp = (FIX_UNITY >> 2) + k - fixMult(k, abs(z));
+		return  (FIX_UNITY >> 1) - fixMult(z, tmp);
+	}
+	else if (y < -abs(x)) {
+		z = fixDiv(x, y);
+		tmp = (FIX_UNITY >> 2) + k - fixMult(k, abs(z));
+		return  -(FIX_UNITY >> 1) - fixMult(z, tmp);
+	}
+	else if (y <= -x && y >= 0) {
+		z = fixDiv(y, x);
+		tmp = (FIX_UNITY >> 2) + k - fixMult(k, abs(z));
+		return FIX_UNITY + fixMult(z, tmp);
+	}
+	else if (y >= x && y < 0) {
+		z = fixDiv(y, x);
+		tmp = (FIX_UNITY >> 2) + k - fixMult(k, abs(z));
+		return -FIX_UNITY + fixMult(z, tmp);
+	}
+	else
+		return 0;
 }
 
-inline intFix fixAtan2(intFix B, intFix A) {
-	float fA = fix2Float(A);
-	float fB = fix2Float(B);
-	return float2Fix(atan2(fB, fA) / (2 * PI));
+inline intFix fixAcos(intFix x) {
+	static const intFix k = float2Fix(0.20264236728); // This is [2/PI^2]
+	return fixSqrt(k - fixMult(k, x));
 }
 
 #endif /* FIXMATH_H */

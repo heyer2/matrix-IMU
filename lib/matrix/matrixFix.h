@@ -13,15 +13,15 @@ struct vec3f {
 
 void vec3fSend(struct vec3f * vec);
 void vec3fPrint(struct vec3f * vec);
-void vec3fZero(struct vec3f * vec);
 void vec3fSet(struct vec3f * vec, intFix x, intFix y, intFix z);
-void vec3fDiv(struct vec3f * vec, intFix k);
-void vec3fDivVec(struct vec3f * vecRes, struct vec3f * vec);
-void vec3fMult(struct vec3f * vec, intFix k);
-void vec3fMultVec(struct vec3f * vecRes, struct vec3f * vec);
+void vec3fZero(struct vec3f * vec);
 void vec3fAdd(struct vec3f * vecA, struct vec3f * vecB, struct vec3f * vecOut);
 void vec3fAccum(struct vec3f * vecAccum, struct vec3f * vecAdd);
+void vec3fMult(struct vec3f * vec, intFix k);
+void vec3fMultVec(struct vec3f * vecRes, struct vec3f * vec);
 void vec3fAccumMult(struct vec3f * vecAccum, struct vec3f * vecAdd, intFix k);
+void vec3fDiv(struct vec3f * vec, intFix k);
+void vec3fDivVec(struct vec3f * vecRes, struct vec3f * vec);
 longFix vec3fDotProd(struct vec3f * vecA, struct vec3f * vecB);
 void vec3fCrossProd(struct vec3f * vecA, struct vec3f * vecB, struct vec3f * vecCross);
 intFix vec3fLength(struct vec3f * vec);
