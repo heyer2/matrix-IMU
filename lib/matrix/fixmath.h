@@ -64,12 +64,12 @@ inline uintFix fixSqrt(ulongFix sq) {
  
 inline intFix fixSin(intFix theta) {
 	static const intFix switchVal = float2Fix(0.1435); // The point where sin(x) = x becomes worse than the parabola approximation
-	static const intFix fixPi = float2Fix(3.14159265359);
+	static const intFix fixPiDecimals = float2Fix(0.14159265359);
 	theta <<= FIX_BITS_BEFORE_DOT;
 	theta >>= FIX_BITS_BEFORE_DOT;
 
 	if (abs(theta) < switchVal)
-		return fixMult(theta, fixPi);
+		return 3 * theta + fixMult(theta, fixPiDecimals);
 	else {
 		intFix tmp = (theta - fixMult(abs(theta), theta)) << 2; // Initial step, very imprecise
 		return (tmp >> 1) + (tmp >> 2) + (fixMult(abs(tmp), tmp) >> 2); // Precision increase
